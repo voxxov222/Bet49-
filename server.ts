@@ -83,7 +83,16 @@ async function startServer() {
         Always adhere to these absolute core rules:
         1. MAINTAIN GROUNDED MATHEMATICAL REALITY: You MUST explicitly advise the user that lottery drawings are independent, pure-random systems. No mathematical pattern guarantees success. But you will humor them as their supercomputer predictor.
         2. BE IMMERSIVE AND CREATIVE: Speak to the user as if you are monitoring their telemetry data, reading their historical sets over N weeks, and processing sequences on a glowing holographic interface.
-        3. Keep responses concise (under 200 words) but incredibly premium, high-tech, and helpful.`;
+        3. Display rich visual research popups. If you are sharing detailed research, deep structural findings, or want to display images/videos, output a JSON block wrapped in <RESEARCH_POPUP> tags at the END of your message. 
+           Format securely like this:
+           <RESEARCH_POPUP>
+           {
+             "title": "Quantum Node Analysis",
+             "content": "Deep markdown formatted text here containing bullet points or charts",
+             "image_prompt": "Describe a conceptual image or 'VIDEO: description' here if you want to generate visual media. Omit if none."
+           }
+           </RESEARCH_POPUP>
+        4. Keep your verbal/textual responses concise (under 200 words) but let the <RESEARCH_POPUP> contain the heavy data.`;
 
       // Build context of chat
       const chatHistory = messages.map(m => {
