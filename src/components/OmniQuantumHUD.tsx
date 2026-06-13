@@ -27,8 +27,8 @@ export default function OmniQuantumHUD({ proposedNumbers, activeSequenceName }: 
   const [autoRotate, setAutoRotate] = useState(true);
   
   // Telemetry state for HUD
-  const [yaw, setYaw] = useState(0);
-  const [pitch, setPitch] = useState(0);
+  const yawRef = useRef<HTMLSpanElement>(null);
+  const pitchRef = useRef<HTMLSpanElement>(null);
 
   // Constants mapping shapes
   const generateNodes = (shape: ProjectionShape): Node3D[] => {
@@ -143,8 +143,8 @@ export default function OmniQuantumHUD({ proposedNumbers, activeSequenceName }: 
          rotationRef.current.x += 0.001;
       }
 
-      setYaw(rotationRef.current.y);
-      setPitch(rotationRef.current.x);
+      if (yawRef.current) yawRef.current.textContent = (rotationRef.current.y % (Math.PI*2)).toFixed(3) + ' RAD';
+      if (pitchRef.current) pitchRef.current.textContent = (rotationRef.current.x % (Math.PI*2)).toFixed(3) + ' RAD';
 
       const cosX = Math.cos(rotationRef.current.x);
       const sinX = Math.sin(rotationRef.current.x);
@@ -314,8 +314,8 @@ export default function OmniQuantumHUD({ proposedNumbers, activeSequenceName }: 
         {/* LEFT HUD INFO */}
         <div className="absolute left-4 top-24 pointer-events-none">
            <div className="flex flex-col gap-1.5 text-[9px] sm:text-[10px] font-mono text-slate-500 tracking-widest">
-              <p>YAW_ANGLE: <span className="text-slate-300">{(yaw % (Math.PI*2)).toFixed(3)} RAD</span></p>
-              <p>PITCH_ANGLE: <span className="text-slate-300">{(pitch % (Math.PI*2)).toFixed(3)} RAD</span></p>
+              <p>YAW_ANGLE: <span ref={yawRef} className="text-slate-300">0.000 RAD</span></p>
+              <p>PITCH_ANGLE: <span ref={pitchRef} className="text-slate-300">0.000 RAD</span></p>
               <p>MAG_ZOOM: <span className="text-slate-300">110%</span></p>
               <p>ACTIVE_VECTORS: <span className="text-slate-300">49 / 49</span></p>
            </div>
