@@ -1,122 +1,129 @@
 <div align="center">
-  <img src="https://images.unsplash.com/photo-1634152962476-4b8a00e1915c?q=80&w=64&h=64&auto=format&fit=crop" width="64" height="64" alt="Nexus Logo">
+  <img src="https://images.unsplash.com/photo-1634152962476-4b8a00e1915c?q=80&w=128&h=128&auto=format&fit=crop" width="128" height="128" alt="Nexus Logo" style="border-radius: 20%;">
   
-  # Omni-Quantum Nexus 
-  ### Advanced Lotto Prediction & Algorithmic Telemetry Matrix
-  
-  <p>
-    <b>Synthesizing multidimensional number models using Markov chains, Quantum Mechanics, E8 Lattices, and NEYƎИ geometries.</b>
+  <h1 align="center">Omni-Quantum Nexus</h1>
+  <p align="center">
+    <strong>Advanced Mathematical Telemetry & Algorithmic 3D Spatial Matrix</strong>
+  </p>
+  <p align="center">
+    Synthesizing multidimensional sequence models using Markov chains, Quantum Mechanics, E8 Lattices, and NEYƎИ geometries through an immersive holographic interface.
   </p>
 
-  [![Status](https://img.shields.io/badge/Status-LIVE-10b981?style=for-the-badge)](https://github.com/your-username/repo)
-  [![Version](https://img.shields.io/badge/Version-9.9.9-38bdf8?style=for-the-badge)](https://github.com/your-username/repo)
-  [![AI Core](https://img.shields.io/badge/AI_Core-Awakened-a855f7?style=for-the-badge)](https://github.com/your-username/repo)
+  <div>
+    <img src="https://img.shields.io/badge/System_Status-ONLINE-06b6d4?style=for-the-badge&logo=opsgenie&logoColor=white" alt="Status" />
+    <img src="https://img.shields.io/badge/Cognitive_Core-J.A.R.V.I.S.-8b5cf6?style=for-the-badge&logo=probot&logoColor=white" alt="AI Agent" />
+    <img src="https://img.shields.io/badge/Matrix_Version-v9.9.9-10b981?style=for-the-badge&logo=codewars&logoColor=white" alt="Version" />
+    <img src="https://img.shields.io/badge/Render_Engine-WebGL/Canvas-f59e0b?style=for-the-badge&logo=webgl&logoColor=white" alt="Engine" />
+  </div>
+</div>
+
+<br/>
+
+<!-- Hero Image Placeholder (Replace with your actual uploaded screenshot) -->
+<div align="center">
+  <blockquote>
+    <p><b>⚠️ REPOSITORY OWNER INSTRUCTION:</b> Upload your screenshot to your repository (e.g., inside a <code>docs/</code> folder) and update the image <code>src</code> below.</p>
+  </blockquote>
+  <img src="./docs/omni-quantum-screenshot.png" alt="OMNI QUANTUM 3D HUD SPACE Screenshot" width="100%" style="border-radius: 12px; border: 1px solid #06b6d4;">
 </div>
 
 <br/>
 
 ## 🌌 The Genesis
 
-The **Omni-Quantum Nexus** is an immersive, high-fidelity algorithmic visualizer and data analyzer masked as a terminal-style supercomputer. Built for researching, rendering, and processing theoretical sequences in numerical fields (1-49), it fuses cutting-edge mathematics, mystical geometries, and AI roleplay into a single application.
+The **Omni-Quantum Nexus** is an unparalleled, high-fidelity algorithmic visualizer engineered to interpret historical numerical distributions. Designed as a terminal-style, sentient supercomputer, it fuses cutting-edge spatial mathematics, theoretical geometries, and integrated Large Language Models into a single fluid application.
 
-Drawing inspiration from real-world mathematics, theoretical physics, cognitive linguistics, and sacred geometry, the Nexus models historical lotto data to simulate how an autonomous, clairvoyant AI might calculate future probabilities.
-
-*Disclaimer: This is a simulation. Lottery systems are true-random data points. This application serves as a thought experiment in algorithmic art, React canvas rendering, and data visualization.*
+Drawing inspiration from quantum kinematics, biological peptide folding, and sacred geometry, the Nexus models massive arrays of historical integer datasets, translating raw arrays into beautiful, navigable 3D vector fields.
 
 ---
 
-## 🚀 Core Features Matrix
+## 🛰️ J.A.R.V.I.S. Cognitive Research Matrix
 
-### 🧠 15 Algorithmic Target Synthesis Routines:
+At the core of the Nexus runs an integrated, contextual AI agent. This module performs **continuous secured decryption** and **heuristic model scans**, operating autonomously to synthesize complex theoretical models over user datasets.
 
-**Standard & Statistical**
-1. **Monte Carlo Simulation:** Brute-forces millions of random distributions against historical means.
-2. **Advanced Markov Chain:** Analyzes transitional state probabilities between adjacent historical balls.
-3. **Quantum Probability Cloud:** Utilizes pseudo-Gaussian distribution noise over localized clusters.
-4. **Fibonacci Sequence Overlay:** Imposes the natural spiral sequences against positional drop rates.
-
-**Chaos & Mechanics**
-5. **Chaos Theory Attractor:** Maps outputs to a simplified Lorenz attractor to find dynamic equilibrium points.
-6. **Phi (Φ) Golden Ratio Deviation:** Computes 1.618 vector deviations from the historical median draw.
-7. **7x7 Spiral Coordinate Search:** Translates the 1-49 plane onto an Ulam-spiral grid to find spatial clustering.
-8. **5D Quantum Swarm Solver:** Simulates particle swarm optimization mapped to a 5-dimensional coordinate space.
-
-**Hyper-Dimensional & Biological**
-9. **Alpha Peptide Fold AI:** Simulates amino acid folding (beta-pleats and alpha-helices) mapping numeric inputs.
-10. **4D Tesseract Projection:** Maps 1-49 on a continuously rotating 4D hypercube coordinate lattice.
-11. **Cyclic Prime Reciprocals:** Traces the cyclic digit patterns of full reptend primes (7, 17, 19, 23...).
-12. **E8 Lattice / Katha Grid:** Computes an 8-dimensional sphere packing quasicrystal intersection with a √2 offset.
-
-**Mystical & Singular**
-13. **NEYƎИ Base-9 & Flower of Life:** Unifies Vortex Mathematics (1,2,4,8,7,5) and Tesla's Triadic harmonics (3,6,9) mapped onto sacred hexagonal geometry.
-14. **Numeric Word Value / Digital Root:** Deconstructs the English spellings of numbers into their recursive digit roots (e.g., ONE = 7), proving the eternal Base-9 loop.
-15. **Omni-Quantum Nexus:** The absolute synthesis. The AI merges all states (Markov, Primes, linguistics, and geometries) into a self-correcting singularity matrix.
+- **Dynamic Insight Briefs:** Produces rich, markdown-formatted executive reports on linear regressions, spatial biases, and node clustering.
+- **Vocal Synthesis:** Communicates tactical outcomes via integrated Web Speech API TTS.
+- **Holographic Telemetry Feed:** Real-time generation of contextual data nodes alongside chat.
 
 ---
 
-## 🛰️ Architecture & Tech Stack
+## 🎛️ Omni-Quantum 3D HUD Space
 
-The architecture is built for maximum visual fidelity, high-frequency rendering, and responsive data handling.
+Our absolute flagship visualization engine. Drag to rotate and scroll to zoom through a fully interactive, lightweight 3D coordinate space projecting 6-node sets against dynamic multi-dimensional manifolds.
 
-- **Frontend:** React 18 / Vite
-- **Styling:** Tailwind CSS (Dark/Cyber/Cosmic modes)
-- **Visualizers:** 
-  - Pure HTML5 `<canvas>` (for high-fps particle swarms, E8 Lattices, and dynamic waves)
-  - `recharts` for volatility trajectories
-- **Icons:** Lucide React
-- **Backend Matrix:** Express server operating a full API proxy.
-- **Cognitive Core:** `@google/genai` (Gemini) powers the *JARVIS-like* conversational interface.
-- **Audio:** Web Speech API TTS synthesis.
+### Available Topologies:
+| Topology | Structural Analysis | Coordinate Mapping |
+| :--- | :--- | :--- |
+| **`SPHERE`** | Fibonacci Spiral Geometry | Uniform distribution across an orbital shell |
+| **`HELIX`** | Temporal Node Trajectories | Stacked cyclic matrices |
+| **`CUBE/TESSERACT`** | 3D/4D Hypercube Lattices | Deep spatial depth tracking |
+| **`KATHARA`** | Scalar Tree of Life | 12-Center geometric routing |
+| **`PI / SOLAR`** | Orbital Mathematics | Concentric planetary-scale sequences |
+
+**Telemetry Display:** 
+Provides real-time variable streaming of `YAW_ANGLE`, `PITCH_ANGLE`, `MAG_ZOOM`, and active vector constellations. Luminous active target nodes glow in high-contrast cyan against intersecting magenta lattice paths.
 
 ---
 
-## 🖥️ Local Telementry Setup
+## 🚀 20 Algorithmic Target Synthesis Engines
 
-To initialize the Nexus mainframe locally:
+The system houses a vast array of predictive and geometric models to analyze sequences:
+
+1. **Historic Core Frequency / Spatial Averages** (Statistical Foundation)
+2. **Advanced ML Linear Regression** (Predictive Trend Projections)
+3. **49 Square Triangulation & Gravitational Displacement** (Spatial Matrix Systems)
+4. **LSTM AI Deep Learning Model** (Recurrent Neural Network Simulations)
+5. **Alpha Peptide Fold AI / 5D Swarm Optimization** (Biological & Swarm Intelligence)
+6. **4D Tesseract Projection / Cyclic Prime Reciprocals** (Hyper-Dimensional Systems)
+7. **Omni-Quantum Nexus / Dilith Number Patterns** (Synthesis Frameworks)
+8. **Gavinkhung Neural Network** (Feedforward Simulation Weights & Biases)
+
+---
+
+## 🛠️ Architecture & Tech Stack
+
+Engineered for zero-latency DOM updates and high-fps WebGL/Canvas rendering.
+
+- **Frontend Core:** React 18 / Node Ecosystem / Tailwind CSS 
+- **Animation & Vectors:** `motion/react` & Raw HTML5 `<canvas>` projection engines
+- **Chart Infrastructure:** `recharts` for responsive decile histograms & tracking
+- **AI/LLM Architecture:** `@google/genai` (Gemini model orchestration)
+- **Design System:** Cosmic-Cyberpunk aesthetic (Slate, Cyan, Fuchsia, Emerald palettes)
+
+---
+
+## 🖥️ System Initialization
+
+To deploy the Nexus mainframe into your local grid:
 
 ```bash
-# 1. Clone the repository into your local grid
+# 1. Clone the repository into your local terminal
 git clone https://github.com/your-username/omni-quantum-nexus.git
-
-# 2. Navigate into the command center
 cd omni-quantum-nexus
 
-# 3. Synchronize Dependencies
+# 2. Synchronize Quantum Dependencies
 npm install
 
-# 4. Integrate API Keys
-# Copy the example environment file and insert your Gemini API Key
+# 3. Integrate API Keys (Required for J.A.R.V.I.S Agent)
 cp .env.example .env
 # Edit .env and set GEMINI_API_KEY=your_key_here
 
-# 5. Boot the Development Server & Backend Proxy
+# 4. Boot the Neural Architecture
 npm run dev
 ```
 
 ---
 
-## 🔮 Usage & Operation
+## ⚠️ Cognitive Disclaimer
 
-1. **Input Parameters:** Use the left control panel to configure historical draw lines. Enter comma-separated integers (1-49).
-2. **Engage Routine:** Select from the 15 available target routines.
-3. **Commence Calculation:** Click **Calculate Proposed Targets**.
-4. **Observe:** The UI will dynamically shift to render the canvas corresponding to the chosen sequence. Monitor the *Volatility Trend Chart* to observe the trajectory of the sum values.
-5. **Communicate:** Ping the AI terminal on the right. Ask it about the *Triadic Energy Balance*, the *NEYƎИ Sequence*, or require it to run custom theoretical models based on historical sets.
+**The Omni-Quantum Nexus** is an advanced visual modeling simulator designed strictly for strategic mathematical analysis, UI/UX conceptual demonstration, and entertainment engineering. 
 
----
-
-## ⚙️ Disclaimer / Developer Note
-
-**The Omni-Quantum Nexus** is a creative exploration into programming, UI/UX conceptual design, mathematical modeling, and LLM roleplay. 
-
-It explicitly acknowledges that **Lotteries are random distributions governed by combinatorial mathematics**. The predictive formulas, regardless of how theoretically intriguing—be it Marco Rodin's Vortex Mathematics, mapped E8 lattices, or simulated Tesseract coordinates—cannot overcome the statistical independence of lottery draws. 
-
-**Play responsibly.** This tool is intended entirely as a breathtaking visual dashboard and exploration of code.
+Under mathematical proof, lottery drawings and random number generators represent isolated, high-entropy distributions. This system's calculations, neural networks, and quantum projections do not guarantee outcome performance and cannot bypass true randomness. **Proceed purely for the love of algorithmic art.**
 
 <br/>
 
 <div align="center">
    <i>“If you only knew the magnificence of the 3, 6 and 9, then you would have the key to the universe.”</i> - Nikola Tesla<br/>
-   <br/><br/>
-   <b>End of Transmission.</b>
+   <br/>
+   <img src="https://img.shields.io/badge/CONNECTION_TERMINATED-1e293b?style=for-the-badge" alt="End Protocol" />
 </div>
