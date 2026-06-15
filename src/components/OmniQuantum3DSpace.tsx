@@ -26,8 +26,10 @@ export default function OmniQuantum3DSpace({
 
   // Layout & 3D orientation states
   const [modelType, setModelType] = useState<'sphere' | 'helix' | 'cube' | 'kathara' | 'fibonacci' | 'pi' | 'tesseract' | 'solar'>('sphere');
-  const [yaw, setYaw] = useState(0.45);
-  const [pitch, setPitch] = useState(0.25);
+  const yawRef = useRef(0.45);
+  const pitchRef = useRef(0.25);
+  const yawTextRef = useRef<HTMLSpanElement | null>(null);
+  const pitchTextRef = useRef<HTMLSpanElement | null>(null);
   const [zoom, setZoom] = useState(1.1);
   const [isDragging, setIsDragging] = useState(false);
   const draggedRef = useRef({ lastX: 0, lastY: 0 });
@@ -186,10 +188,10 @@ export default function OmniQuantum3DSpace({
 
       nodeCoordinates.forEach(node => {
         // Apply Rotations to node
-        const cosY = Math.cos(yaw);
-        const sinY = Math.sin(yaw);
-        const cosP = Math.cos(pitch);
-        const sinP = Math.sin(pitch);
+        const cosY = Math.cos(yawRef.current);
+        const sinY = Math.sin(yawRef.current);
+        const cosP = Math.cos(pitchRef.current);
+        const sinP = Math.sin(pitchRef.current);
 
         const x1 = node.x * cosY - node.z * sinY;
         const z1 = node.x * sinY + node.z * cosY;
@@ -220,8 +222,8 @@ export default function OmniQuantum3DSpace({
     const deltaY = e.clientY - draggedRef.current.lastY;
     draggedRef.current = { lastX: e.clientX, lastY: e.clientY };
 
-    setYaw(prev => prev + deltaX * 0.005);
-    setPitch(prev => Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, prev + deltaY * 0.005)));
+    yawRef.current += deltaX * 0.005;
+    pitchRef.current = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, pitchRef.current + deltaY * 0.005));
     setAutoRotate(false);
   };
 
@@ -259,15 +261,22 @@ export default function OmniQuantum3DSpace({
       const fov = 350;
 
       // Autoration increment
-      let currentYaw = yaw;
       if (autoRotate && !isDragging) {
-        currentYaw += 0.0028;
+        yawRef.current = (yawRef.current + 0.0018) % (Math.PI * 2);
       }
 
-      const cosY = Math.cos(currentYaw);
-      const sinY = Math.sin(currentYaw);
-      const cosP = Math.cos(pitch);
-      const sinP = Math.sin(pitch);
+      // Update telemetry text directly
+      if (yawTextRef.current) {
+        yawTextRef.current.textContent = `YAW_ANGLE: ${yawRef.current.toFixed(3)} RAD`;
+      }
+      if (pitchTextRef.current) {
+        pitchTextRef.current.textContent = `PITCH_ANGLE: ${pitchRef.current.toFixed(3)} RAD`;
+      }
+
+      const cosY = Math.cos(yawRef.current);
+      const sinY = Math.sin(yawRef.current);
+      const cosP = Math.cos(pitchRef.current);
+      const sinP = Math.sin(pitchRef.current);
 
       // Map out actual projected node locations
       const projectedNodes = nodeCoordinates.map(node => {
@@ -554,17 +563,12 @@ export default function OmniQuantum3DSpace({
         }
       });
 
-      // Update external rotation angle
-      if (autoRotate && !isDragging) {
-        setYaw(prev => (prev + 0.0018) % (Math.PI * 2));
-      }
-
       animId = requestAnimationFrame(render);
     };
 
     render();
     return () => cancelAnimationFrame(animId);
-  }, [nodeCoordinates, yaw, pitch, zoom, isDragging, activeProposedNumbers, draws, showDrawLines, autoRotate]);
+  }, [nodeCoordinates, zoom, isDragging, activeProposedNumbers, draws, showDrawLines, autoRotate]);
 
   return (
     <div className="bg-black/45 border border-cyan-500/15 rounded-2xl p-4 flex flex-col gap-4 shadow-[0_4px_30px_rgba(0,0,0,0.5)] relative overflow-hidden h-[460px] group/space">
@@ -613,8 +617,8 @@ export default function OmniQuantum3DSpace({
 
         {/* Dynamic coordinate crosshairs */}
         <div className="absolute top-4 left-4 font-mono text-[8px] text-slate-500 pointer-events-none flex flex-col gap-0.5 select-none opacity-80">
-          <span>YAW_ANGLE: {yaw.toFixed(3)} RAD</span>
-          <span>PITCH_ANGLE: {pitch.toFixed(3)} RAD</span>
+          <span ref={yawTextRef}>YAW_ANGLE: {yawRef.current.toFixed(3)} RAD</span>
+          <span ref={pitchTextRef}>PITCH_ANGLE: {pitchRef.current.toFixed(3)} RAD</span>
           <span>MAG_ZOOM: {(zoom * 100).toFixed(0)}%</span>
           <span>ACTIVE_VECTORS: {nodeCoordinates.length} / 49</span>
         </div>
