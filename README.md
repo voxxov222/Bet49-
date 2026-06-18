@@ -83,17 +83,3 @@ npm install
 # 3. Boot the Hub
 npm run dev
 ```
-
----
-
-## ⚠️ Cognitive Disclaimer
-
-**The bet49 Tactical Hub OS v5.2** is an advanced visual modeling simulator designed strictly for UI/UX conceptual demonstration, aesthetic computing, and mathematical art. 
-
-Under mathematical proof, lottery drawings and random number generators represent isolated, high-entropy distributions. This system's calculations, neural networks, and simulated quantum components **do not guarantee outcome performance and cannot bypass true randomness.** 
-
-<br/>
-
-<div align="center">
-   <img src="https://img.shields.io/badge/COGNITIVE_INTERCEPT-V5.2-1e293b?style=for-the-badge" alt="End Protocol" />
-</div>
