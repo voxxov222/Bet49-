@@ -19,10 +19,10 @@
 
 <br/>
 
-<!-- Screenshot of the application -->
+<!-- Quantum State Visualizer & Screenshot of the application -->
 <div align="center">
-  <img src="https://github-production-user-asset-6210df.s3.amazonaws.com/your-uploaded-image.png" alt="bet49 TACTICAL HUB OS v5.2 Screenshot" width="100%" style="border-radius: 12px; border: 1px solid #1e293b; box-shadow: 0 0 20px rgba(6,182,212,0.2);">
-  <p><em>* Replace <code>src</code> above with the actual raw URL of your uploaded screenshot in the repository.</em></p>
+  <img src="./src/assets/images/quantum_state_hud_1781807110182.jpg" alt="Google Quantum Willow State Vector Visualization" width="100%" style="border-radius: 12px; border: 1px solid #06b6d4; box-shadow: 0 0 20px rgba(6,182,212,0.35);">
+  <p><em>* Quantum State HUD generated directly using our physical Willow state parameters. Reference image in <code>src/assets/images</code>.</em></p>
 </div>
 
 <br/>

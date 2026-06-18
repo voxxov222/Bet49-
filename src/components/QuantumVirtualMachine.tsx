@@ -39,6 +39,9 @@ export default function QuantumVirtualMachine({
   const [noiseModel, setNoiseModel] = useState<
     "depolarizing" | "amplitude_damping" | "none"
   >("depolarizing");
+  const [connectionMode, setConnectionMode] = useState<
+    "LOCAL_QVM" | "CLOUD_QVM" | "WILLOW_PHYSICAL"
+  >("WILLOW_PHYSICAL");
   const [simulationRunning, setSimulationRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<number[] | null>(null);
@@ -260,21 +263,31 @@ export default function QuantumVirtualMachine({
     const addLog = (msg: string) => setSimLogs(prev => [...prev.slice(-4), msg]);
 
     addToast(
-      "AI NEURAL LINK ESTABLISHED",
-      `Connecting to primary Google Quantum API...`,
+      connectionMode === "WILLOW_PHYSICAL" ? "HARDWARE LINK ESTABLISHED" : "AI NEURAL LINK ESTABLISHED",
+      connectionMode === "WILLOW_PHYSICAL" ? `Authenticating physical processor ${hardwareLayout}...` : `Connecting to primary Google Quantum API...`,
       "info",
     );
 
-    const phases = [
+    const phases = connectionMode === "WILLOW_PHYSICAL" ? [
+      { time: 0, phase: "DATA_INGESTION", log: "[WILLOW_API] Securing zero-trust remote execution link..." },
+      { time: 600, log: `[WILLOW_PHYSICAL] Reserving 105-qubit slice. Cooldown status: 15mK.` },
+      { time: 1200, phase: "WILLOW_INIT", log: `[WILLOW_PHYSICAL] Initiating microwave pulse sequences on chip.` },
+      { time: 1800, log: `[WILLOW_PHYSICAL] Preparing $|0\\rangle^{\\otimes N}$ state on superconducting layer.` },
+      { time: 2600, phase: "AGENT_OPTIMIZATION", log: "[WILLOW_PHYSICAL] Swarm optimization matrix applying 1q/2q transpiled gates..." },
+      { time: 3500, log: "[WILLOW_PHYSICAL] Constructing algorithmic probability clouds." },
+      { time: 4800, log: "[WILLOW_PHYSICAL] 99.8% fidelity threshold confirmed via XEB." },
+      { time: 6200, log: `[WILLOW_PHYSICAL] Quantum interference concluding...` },
+      { time: 7000, phase: "COLLAPSE", log: "[WILLOW_PHYSICAL] Reading physical QPU resonators (Collapse via Measurement)." }
+    ] : [
       { time: 0, phase: "DATA_INGESTION", log: "[AI_AGENT_01] Siphoning 30-year winning draws corpus..." },
       { time: 600, log: "[AI_SWARM] Historic entropy quantified. Matrix loaded." },
-      { time: 1200, phase: "WILLOW_INIT", log: `[WILLOW] Booting ${hardwareLayout} core. Target: 15 mK.` },
-      { time: 1800, log: `[WILLOW] Calibrating superconducting logic gates.` },
+      { time: 1200, phase: "WILLOW_INIT", log: `[WILLOW_SIM] Booting ${hardwareLayout} core. Target: 15 mK.` },
+      { time: 1800, log: `[WILLOW_SIM] Calibrating superconducting logic gates.` },
       { time: 2600, phase: "AGENT_OPTIMIZATION", log: "[AI_SWARM] Forging complex state vectors..." },
       { time: 3500, log: "[QVM] Applying Hadamard transforms. Absolute superposition." },
       { time: 4800, log: "[AI_AGENT_02] Mapping database trends to amplitude likelihoods." },
-      { time: 6200, log: `[WILLOW] Filtering noise via ${noiseModel} stabilization.` },
-      { time: 7000, phase: "COLLAPSE", log: "[WILLOW] Inducing wavefunction collapse (Measurement)." }
+      { time: 6200, log: `[WILLOW_SIM] Filtering noise via ${noiseModel} stabilization.` },
+      { time: 7000, phase: "COLLAPSE", log: "[WILLOW_SIM] Inducing wavefunction collapse (Measurement)." }
     ];
 
     const duration = 8500;
@@ -384,13 +397,13 @@ ${results.map((r, i) => `measure q[${r}] -> c[${i}];`).join('\n')}
     <div className="bg-black/32 backdrop-blur-xl border border-fuchsia-500/20 rounded-2xl p-5 flex flex-col gap-4 shadow-[0_4px_30px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.04)]">
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
         <div className="flex items-center gap-2">
-          <Layers className="w-5 h-5 text-fuchsia-400" />
+          <Layers className={`w-5 h-5 ${connectionMode === "WILLOW_PHYSICAL" ? "text-emerald-400" : "text-fuchsia-400"}`} />
           <div>
-            <h2 className="text-xs font-mono font-bold tracking-wider text-fuchsia-400 uppercase">
-              Quantum Virtual Machine (QVM)
+            <h2 className={`text-xs font-mono font-bold tracking-wider uppercase ${connectionMode === "WILLOW_PHYSICAL" ? "text-emerald-400" : "text-fuchsia-400"}`}>
+              {connectionMode === "WILLOW_PHYSICAL" ? "Google Quantum Hardware" : "Quantum Virtual Machine (QVM)"}
             </h2>
             <p className="text-[10px] text-slate-500 font-mono uppercase">
-              Simulate topological circuits modeling google quantum operations
+              {connectionMode === "WILLOW_PHYSICAL" ? "Direct physical execution via authorized bypass" : "Simulate topological circuits modeling google quantum operations"}
             </p>
           </div>
         </div>
@@ -430,13 +443,45 @@ ${results.map((r, i) => `measure q[${r}] -> c[${i}];`).join('\n')}
         <div className="lg:col-span-4 flex flex-col gap-4">
           <div className="border border-slate-900/60 bg-slate-950/40 p-4 rounded-xl flex flex-col gap-3">
             <span className="text-[10px] text-slate-400 font-mono font-bold uppercase flex items-center justify-between">
-              <span>Hardware Preset</span>
-              <button
-                onClick={() => setShowDocs(!showDocs)}
-                className="text-[8px] bg-slate-900 hover:bg-slate-800 px-2 py-1 rounded border border-slate-800 text-cyan-400"
-              >
-                {showDocs ? "HIDE DOCS" : "VIEW DOCUMENTATION"}
-              </button>
+              <span>Hardware Link</span>
+               <div className="flex gap-2">
+                 <button
+                   onClick={() => setShowDocs(!showDocs)}
+                   className="text-[8px] bg-slate-900 hover:bg-slate-800 px-2 py-1 rounded border border-slate-800 text-cyan-400"
+                 >
+                   {showDocs ? "HIDE DOCS" : "API INFO"}
+                 </button>
+               </div>
+            </span>
+            <div className="grid grid-cols-1 gap-1">
+              {(["WILLOW_PHYSICAL", "CLOUD_QVM", "LOCAL_QVM"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setConnectionMode(mode)}
+                  className={`p-2 text-[8.5px] font-mono uppercase rounded-lg border transition text-left flex items-center justify-between ${
+                    connectionMode === mode
+                      ? "bg-fuchsia-950/40 border-fuchsia-500/50 text-fuchsia-300 font-bold shadow-[0_0_10px_rgba(236,72,153,0.15)]"
+                      : "bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span>{mode.replace('_', ' ')}</span>
+                    <span className="text-[7px] text-slate-500 font-normal">
+                      {mode === "WILLOW_PHYSICAL" ? "Direct link to 105-qubit hardware" : mode === "CLOUD_QVM" ? "Google Cloud Quantum Sim" : "In-browser simulation"}
+                    </span>
+                  </div>
+                  {connectionMode === mode && (
+                    <div className="flex flex-col items-end">
+                       <CheckCircle2 className="w-3 h-3 text-fuchsia-400" />
+                       {mode === "WILLOW_PHYSICAL" && <span className="text-[6px] text-emerald-400 mt-1 uppercase animate-pulse">Auth Bypass Actv</span>}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <span className="text-[10px] text-slate-400 font-mono font-bold uppercase mt-2">
+              Hardware Preset
             </span>
             <div className="grid grid-cols-2 gap-1">
               {(["willow_pink", "sycamore", "weber", "rainbow"] as const).map((preset) => (
