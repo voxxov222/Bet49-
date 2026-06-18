@@ -17,6 +17,7 @@ import SplashVortexPage from './components/SplashVortexPage';
 import KagglehubDatasetSync from './components/KagglehubDatasetSync';
 import StrategyProbabilityHeatmap from './components/StrategyProbabilityHeatmap';
 import QuantumStringTabSpace from './components/QuantumStringTabSpace';
+import QuantumVirtualMachine from './components/QuantumVirtualMachine';
 import FloatingAgentJarvis from './components/FloatingAgentJarvis';
 import Markdown from 'react-markdown';
 import { AnimatePresence } from 'motion/react';
@@ -26,7 +27,7 @@ import {
   HelpCircle, Settings, Play, Pause, Send, ArrowRight, 
   Plus, Trash2, Database, Layers, Sparkles, Network, 
   ChevronRight, Volume2, VolumeX, Square, ExternalLink, Menu, X, Copy, Check, Sliders, Activity, Grid, Hexagon,
-  Calendar, Clock, History as HistoryIcon
+  Calendar, Clock, History as HistoryIcon, Eye
 } from 'lucide-react';
 
 // Define structures
@@ -171,11 +172,14 @@ export default function App() {
   const [copied, setCopied] = useState<boolean>(false);
 
   // Advanced Visual UX / Toast & Calculating States
-  const [activeCategory, setActiveCategory] = useState<'engines' | 'analytics' | 'summary' | 'data' | 'jarvis' | 'simple' | 'swarms' | 'string3d'>('engines');
+  const [activeCategory, setActiveCategory] = useState<'engines' | 'analytics' | 'summary' | 'data' | 'jarvis' | 'simple' | 'swarms' | 'string3d' | 'qvm'>('engines');
   const [toasts, setToasts] = useState<{ id: string; type: 'success' | 'info' | 'error' | 'warning'; title: string; message: string }[]>([]);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isControlPanelOpen, setIsControlPanelOpen] = useState(false);
   const [revealCount, setRevealCount] = useState(6);
+  const [showProbabilityOverlay, setShowProbabilityOverlay] = useState(false);
+  const [showEntropyOverlay, setShowEntropyOverlay] = useState(false);
+  const [probabilityIntensity, setProbabilityIntensity] = useState(50);
 
   // Concentric 6-Draw Pattern Predictor States
   const [patternAnalysisMode, setPatternAnalysisMode] = useState<string>('spiral-gravity');
@@ -3772,6 +3776,7 @@ export default function App() {
             { id: 'engines', label: 'QUANTUM ENGINES' },
             { id: 'analytics', label: 'PATTERN ANALYTICS' },
             { id: 'string3d', label: '🌌 STRING WIREFRAME 3D' },
+            { id: 'qvm', label: '⚛️ QUANTUM VM' },
             { id: 'summary', label: 'INSIGHTS & SUMMARY' },
             { id: 'data', label: 'HISTORICAL DATA' },
             { id: 'jarvis', label: 'J.A.R.V.I.S. HUB' }
@@ -5476,8 +5481,37 @@ export default function App() {
                   <p className="text-[10px] text-slate-500 font-mono">LAST 50 HISTORIC DENSITY OVERLAYS (SPIRAL_MAP)</p>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  id="spiral-heatmap-entropy-toggle"
+                  onClick={() => setShowEntropyOverlay(!showEntropyOverlay)}
+                  className={`px-3 py-1.5 font-mono text-[9px] font-black tracking-wider uppercase rounded-xl border transition-all cursor-pointer ${showEntropyOverlay ? 'bg-fuchsia-950/40 border-fuchsia-500 text-fuchsia-300 shadow-[0_0_8px_rgba(217,70,239,0.4)]' : 'bg-slate-950 border-slate-800 text-slate-500'}`}
+                >
+                  <Activity className="w-3.5 h-3.5 inline mr-1" />
+                  {showEntropyOverlay ? 'HIDE ENTROPY VIEW' : 'SHOW ENTROPY VIEW'}
+                </button>
+                <button
+                  id="spiral-heatmap-probability-toggle"
+                  onClick={() => setShowProbabilityOverlay(!showProbabilityOverlay)}
+                  className={`px-3 py-1.5 font-mono text-[9px] font-black tracking-wider uppercase rounded-xl border transition-all cursor-pointer ${showProbabilityOverlay ? 'bg-cyan-950/40 border-cyan-500 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.4)]' : 'bg-slate-950 border-slate-800 text-slate-500'}`}
+                >
+                  <Eye className="w-3.5 h-3.5 inline mr-1" />
+                  {showProbabilityOverlay ? 'HIDE PROBABILITY VECTOR' : 'SHOW PROBABILITY VECTOR'}
+                </button>
+                {showProbabilityOverlay && (
+                  <div className="flex items-center gap-2 pr-3 border-r border-slate-800 ml-2">
+                    <span className="text-[9px] font-mono text-cyan-500/80">INTENSITY</span>
+                    <input 
+                      type="range" 
+                      min="10" 
+                      max="100" 
+                      value={probabilityIntensity}
+                      onChange={(e) => setProbabilityIntensity(parseInt(e.target.value))}
+                      className="w-20 accent-emerald-500 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+                )}
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse ml-2" />
                 <span className="text-[9px] font-mono text-cyan-500/80">INTEGRATED ANALYTICS</span>
               </div>
             </div>
@@ -5547,10 +5581,32 @@ export default function App() {
                     const count = spiralHeatmapData.freq[num] || 0;
                     const isProposed = proposedNumbers.includes(num);
 
+                    const distanceThreshold = 1.0 + (probabilityIntensity / 100) * 3.0;
+                    const distFromCentroid = Math.sqrt(Math.pow(coord.r - spiralHeatmapData.centroid.r, 2) + Math.pow(coord.c - spiralHeatmapData.centroid.c, 2));
+                    const isHighProb = showProbabilityOverlay && distFromCentroid <= distanceThreshold;
+                    const probScore = isHighProb ? Math.max(0, 1 - distFromCentroid / (distanceThreshold + 0.5)) : 0;
+
+                    // Compute pseudo-entropy based variance using cell count vs total count and some fake distance
+                    const entropyScore = showEntropyOverlay ? Math.sin(num * 0.5 + coord.r * 1.5) * 0.5 + 0.5 + (count * 0.1) : 0;
+
                     let cellBg = "bg-slate-950 hover:bg-slate-900 text-slate-600 border border-slate-900/45";
                     let glowStyle = {};
                     if (isProposed) {
                       cellBg = "bg-gradient-to-br from-cyan-500 to-blue-500 text-slate-950 font-extrabold ring-1 ring-cyan-400 shadow-[0_0_8px_#06b6d4]";
+                    } else if (showEntropyOverlay) {
+                      // Color variance representing entropy intensity (fuchsia to yellow)
+                      const opacityVal = 0.2 + entropyScore * 0.6;
+                      cellBg = `bg-fuchsia-950/60 text-fuchsia-200 border border-fuchsia-500/50 shadow-[0_0_8px_rgba(217,70,239,0.3)] animate-pulse`;
+                      glowStyle = { 
+                        backgroundColor: `rgba(217, 70, 239, ${opacityVal})`,
+                        boxShadow: `0 0 ${4 + entropyScore * 10}px rgba(250, 204, 21, ${entropyScore * 0.5})`
+                      };
+                    } else if (isHighProb) {
+                      cellBg = "bg-emerald-950/70 text-emerald-300 border border-emerald-500/50 animate-pulse";
+                      glowStyle = { 
+                        backgroundColor: `rgba(16, 185, 129, ${probScore * (0.2 + probabilityIntensity / 200)})`,
+                        boxShadow: `0 0 ${4 + probabilityIntensity / 5}px rgba(16,185,129,${probScore * 0.6})`
+                      };
                     } else if (count >= 7) {
                       cellBg = "bg-gradient-to-r from-pink-900 to-amber-955 text-amber-100 border border-amber-500/40 font-bold animate-pulse";
                       glowStyle = { boxShadow: '0 0 10px rgba(245,158,11,0.25)' };
@@ -5573,11 +5629,17 @@ export default function App() {
                           ...glowStyle
                         }}
                         className={`aspect-square flex items-center justify-center rounded text-[9px] font-mono leading-none select-none transition-all duration-300 relative group cursor-help ${cellBg}`}
-                        title={`Number: ${num} | Hits: ${count}/50 draws | Coords: (${coord.r}, ${coord.c})`}
+                        title={`Number: ${num} | Hits: ${count}/50 draws | Dist to Centroid: ${distFromCentroid.toFixed(2)}`}
                       >
                         <span>{num}</span>
+                        {isHighProb && !isProposed && !showEntropyOverlay && (
+                          <div className="absolute inset-0 bg-emerald-400 mix-blend-overlay opacity-30 rounded pointer-events-none" />
+                        )}
+                        {showEntropyOverlay && !isProposed && (
+                          <div className="absolute inset-0 bg-fuchsia-400 mix-blend-overlay opacity-40 rounded pointer-events-none" />
+                        )}
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 bg-slate-950 text-slate-300 border border-cyan-500/20 rounded py-0.5 px-1.5 text-[7px] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap shadow-md">
-                          N-{num} ({count} Hits)
+                          N-{num} ({count} Hits) {showEntropyOverlay ? `| ENTROPY: ${entropyScore.toFixed(2)}` : ''}
                         </div>
                       </div>
                     );
@@ -6789,6 +6851,18 @@ export default function App() {
             <QuantumStringTabSpace 
               draws={draws}
               activeProposedNumbers={proposedNumbers}
+              onApplyNumbers={(nums) => setProposedNumbers(nums)}
+              playSpeech={playSpeech}
+              isTTSEnabled={isTTSEnabled}
+              addToast={(title, message, type) => addToast(title, message, type as any)}
+            />
+          </section>
+        )}
+
+        {/* ⚛️ QUANTUM VIRTUAL MACHINE */}
+        {activeCategory === 'qvm' && (
+          <section className="flex flex-col gap-5 w-full">
+            <QuantumVirtualMachine 
               onApplyNumbers={(nums) => setProposedNumbers(nums)}
               playSpeech={playSpeech}
               isTTSEnabled={isTTSEnabled}
