@@ -11,8 +11,13 @@ import MultivariateMLPredictor from './components/MultivariateMLPredictor';
 import OmniQuantumHUD from './components/OmniQuantumHUD';
 import CorvusCodexLotteryAi from './components/CorvusCodexLotteryAi';
 import IshanoshadaPredictor from './components/IshanoshadaPredictor';
+import SimplePredictorDeck from './components/SimplePredictorDeck';
+import AgentSwarmEngine from './components/AgentSwarmEngine';
+import SplashVortexPage from './components/SplashVortexPage';
 import KagglehubDatasetSync from './components/KagglehubDatasetSync';
 import StrategyProbabilityHeatmap from './components/StrategyProbabilityHeatmap';
+import QuantumStringTabSpace from './components/QuantumStringTabSpace';
+import FloatingAgentJarvis from './components/FloatingAgentJarvis';
 import Markdown from 'react-markdown';
 import { AnimatePresence } from 'motion/react';
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid, LabelList, BarChart, Bar, Cell, ScatterChart, Scatter, ZAxis } from 'recharts';
@@ -20,7 +25,8 @@ import {
   Terminal, ShieldCheck, Cpu, RefreshCw, BarChart3, LineChart, 
   HelpCircle, Settings, Play, Pause, Send, ArrowRight, 
   Plus, Trash2, Database, Layers, Sparkles, Network, 
-  ChevronRight, Volume2, VolumeX, Square, ExternalLink, Menu, X, Copy, Check, Sliders, Activity, Grid
+  ChevronRight, Volume2, VolumeX, Square, ExternalLink, Menu, X, Copy, Check, Sliders, Activity, Grid, Hexagon,
+  Calendar, Clock, History as HistoryIcon
 } from 'lucide-react';
 
 // Define structures
@@ -35,6 +41,8 @@ interface Message {
   role: 'user' | 'jarvis';
   content: string;
   timestamp: string;
+  webSources?: { title: string; uri: string }[];
+  commandExecuted?: { name: string; info: string };
 }
 
 // Preset historical Lotto 649 draws for seed data
@@ -149,13 +157,21 @@ export default function App() {
     return saved ? JSON.parse(saved) : DEFAULT_DRAWS;
   });
 
+  const [selectedRegionName, setSelectedRegionName] = useState<string>(() => {
+    return localStorage.getItem('bet49_region_name') || 'Canada (Northern Matrix)';
+  });
+  const [selectedLotteryName, setSelectedLotteryName] = useState<string>(() => {
+    return localStorage.getItem('bet49_lottery_name') || 'Canada Lotto 6/49 (National)';
+  });
+
   const [selectedStrategy, setSelectedStrategy] = useState<string>('freq-10');
   const [proposedNumbers, setProposedNumbers] = useState<number[]>([]);
   const [isWCLCStreamOpen, setIsWCLCStreamOpen] = useState(false);
+  const [showSplash, setShowSplash] = useState<boolean>(true);
   const [copied, setCopied] = useState<boolean>(false);
 
   // Advanced Visual UX / Toast & Calculating States
-  const [activeCategory, setActiveCategory] = useState<'engines' | 'analytics' | 'summary' | 'data' | 'jarvis'>('engines');
+  const [activeCategory, setActiveCategory] = useState<'engines' | 'analytics' | 'summary' | 'data' | 'jarvis' | 'simple' | 'swarms' | 'string3d'>('engines');
   const [toasts, setToasts] = useState<{ id: string; type: 'success' | 'info' | 'error' | 'warning'; title: string; message: string }[]>([]);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isControlPanelOpen, setIsControlPanelOpen] = useState(false);
@@ -177,6 +193,9 @@ export default function App() {
 
   // Jarvis Popup State
   const [jarvisPopup, setJarvisPopup] = useState<{isOpen: boolean; title: string; content: string; imagePrompt: string | null}>({ isOpen: false, title: '', content: '', imagePrompt: null });
+
+  // Next Draw Dynamic Countdown
+  const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
   // Strategy layout category mapper
   const getStrategyCategory = useCallback((stratId: string) => {
@@ -234,6 +253,57 @@ export default function App() {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 4000);
   };
+
+  // Synchronized countdown hook for Lotto 6/49
+  useEffect(() => {
+    const getNextDrawDate = () => {
+      const now = new Date();
+      let target = new Date();
+      target.setHours(22, 30, 0, 0); // 10:30 PM
+
+      const currentDay = now.getDay();
+      const currentHour = now.getHours();
+      const currentMin = now.getMinutes();
+
+      let daysToAdd = 0;
+      if (currentDay === 3) {
+        if (currentHour > 22 || (currentHour === 22 && currentMin >= 30)) daysToAdd = 3;
+        else daysToAdd = 0;
+      } else if (currentDay === 6) {
+        if (currentHour > 22 || (currentHour === 22 && currentMin >= 30)) daysToAdd = 4;
+        else daysToAdd = 0;
+      } else {
+        if (currentDay < 3) daysToAdd = 3 - currentDay;
+        else if (currentDay < 6) daysToAdd = 6 - currentDay;
+        else daysToAdd = 3;
+      }
+      target.setDate(now.getDate() + daysToAdd);
+      return target;
+    };
+
+    const targetDate = getNextDrawDate();
+
+    const updateTime = () => {
+      const now = new Date();
+      const diff = targetDate.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        setCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((diff / (1000 * 60)) % 60);
+      const seconds = Math.floor((diff / 1000) % 60);
+
+      setCountdown({ days, hours, minutes, seconds });
+    };
+
+    updateTime();
+    const intervalId = setInterval(updateTime, 1000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   // Pulse materializing sequential reveal loop
   useEffect(() => {
@@ -3330,11 +3400,45 @@ export default function App() {
          }
       }
 
+      // Check for command execution returned from server
+      let commandInfo: { name: string; info: string } | undefined;
+      if (data.command) {
+        const cmd = data.command;
+        if (cmd.name === 'editProposedSequence' && cmd.args?.numbers) {
+          const numbers = cmd.args.numbers;
+          setProposedNumbers(numbers);
+          commandInfo = {
+            name: 'editProposedSequence',
+            info: `Synchronized prediction card to: ${numbers.join(', ')}`
+          };
+          addToast(
+            'SEQUENCE SYNCHRONIZED',
+            `J.A.R.V.I.S. updated active predictive deck to: ${numbers.join(', ')}`,
+            'success'
+          );
+        } else if (cmd.name === 'calculateProbability' && cmd.args?.numbers) {
+          const numbers = cmd.args.numbers;
+          setProposedNumbers(numbers); // Automatically set numbers for ease of view
+          const detail = cmd.result ? `Sum: ${cmd.result.sum} (${cmd.result.oddEvenRatio}) | ${cmd.result.consecutiveNumbers} Consecutives` : '';
+          commandInfo = {
+            name: 'calculateProbability',
+            info: `Evaluated ${numbers.join(', ')}. ${detail}`
+          };
+          addToast(
+            'PROBABILITY EVALUATED',
+            `Calculated sum ${cmd.result?.sum || ''} is ${cmd.result?.sumStatus || 'verified'}.`,
+            'info'
+          );
+        }
+      }
+
       const jarvisMessage: Message = {
         id: Math.random().toString(),
         role: 'jarvis',
         content: replyContent,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        webSources: data.webSources,
+        commandExecuted: commandInfo
       };
 
       setMessages(prev => [...prev, jarvisMessage]);
@@ -3503,6 +3607,32 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {isBooted && showSplash && (
+          <SplashVortexPage
+            draws={draws}
+            onEnter={(regionName, configName, regionalDraws) => {
+              setSelectedRegionName(regionName);
+              setSelectedLotteryName(configName);
+              setDraws(regionalDraws);
+              
+              localStorage.setItem('bet49_region_name', regionName);
+              localStorage.setItem('bet49_lottery_name', configName);
+              localStorage.setItem('bet49_draws', JSON.stringify(regionalDraws));
+              setShowSplash(false);
+              
+              addToast(
+                'SYSTEM CALIBRATED: ' + configName.toUpperCase(),
+                `Central neural arrays orienting to ${regionName} grid database. Successfully indexed ${regionalDraws.length} reference records.`,
+                'success'
+              );
+            }}
+            playSpeech={playSpeech}
+            isTTSEnabled={isTTSEnabled}
+          />
+        )}
+      </AnimatePresence>
+
       {/* 60FPS Low-overhead Cosmic Drifting Background Canvas */}
       <canvas ref={cosmicCanvasRef} className="fixed inset-0 pointer-events-none z-0 overflow-hidden w-full h-full" />
       
@@ -3550,7 +3680,9 @@ export default function App() {
               <span className="text-lg font-mono font-bold tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 select-none">bet49</span>
               <span className="text-[10px] bg-cyan-950 text-cyan-400 font-mono px-1.5 py-0.5 rounded border border-cyan-500/30 uppercase tracking-widest">Jarvis vTC-649</span>
             </div>
-            <p className="text-[11px] text-slate-400 font-mono tracking-tight select-none">LOTTO 649 MULTI-STRATEGY AI TACTICAL HUB</p>
+            <p className="text-[11px] text-slate-400 font-mono tracking-tight select-none uppercase">
+              HUB // <span className="text-cyan-400 font-extrabold">{selectedLotteryName}</span> <span className="text-slate-500">({selectedRegionName})</span>
+            </p>
           </div>
         </div>
 
@@ -3603,6 +3735,22 @@ export default function App() {
             <span>VOICE: {isTTSEnabled ? 'ONLINE' : 'MUTED'}</span>
           </button>
 
+          {/* Splash portal button */}
+          <button 
+            id="splash-portal-btn"
+            onClick={() => {
+              setShowSplash(true);
+              if (isTTSEnabled) {
+                playSpeech("Recalibrating spatial vortex grid. Returning to primary entry portal.");
+              }
+              addToast('VORTEX RE-ENTRY', 'Returning to 64-tetrahedron splash portal.', 'info');
+            }}
+            className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-purple-600/90 to-indigo-600/90 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-mono px-4 py-2 rounded-lg shadow-lg border border-purple-400/20 transition-all duration-300"
+          >
+            <Hexagon className="w-4 h-4 text-purple-350 rotate-12" />
+            <span>TETRA VORTEX CORE</span>
+          </button>
+
           {/* Swipe Portal button */}
           <button 
             id="menu-wclc-btn"
@@ -3619,8 +3767,11 @@ export default function App() {
       <div className="flex justify-center border-b border-cyan-500/10 px-4 bg-slate-950/60 w-full overflow-x-auto scrollbar-hide">
         <div className="flex gap-2 py-0 min-w-max">
           {[
+            { id: 'simple', label: '⚡ SIMPLE PREDICTIONS' },
+            { id: 'swarms', label: '🧬 AGENT SWARMS' },
             { id: 'engines', label: 'QUANTUM ENGINES' },
             { id: 'analytics', label: 'PATTERN ANALYTICS' },
+            { id: 'string3d', label: '🌌 STRING WIREFRAME 3D' },
             { id: 'summary', label: 'INSIGHTS & SUMMARY' },
             { id: 'data', label: 'HISTORICAL DATA' },
             { id: 'jarvis', label: 'J.A.R.V.I.S. HUB' }
@@ -3643,6 +3794,114 @@ export default function App() {
 
       {/* CORE DISPLAY FLOOR */}
       <main className="flex-1 max-w-7xl mx-auto w-full flex flex-col gap-6 p-4 sm:p-6 z-10 overflow-y-auto relative">
+
+        {/* Lotto 649 LIVE SCHEDULE AND HIGHLIGHT BANNER */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 bg-slate-900/60 backdrop-blur-md border border-cyan-500/20 rounded-2xl p-4 sm:p-5 shadow-[0_4px_30px_rgba(0,0,0,0.4)] relative overflow-hidden select-none">
+          {/* Subtle neon linear reflection */}
+          <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent" />
+          
+          {/* Column 1 - Next Draw Alert Countdown (5 cols) */}
+          <div className="md:col-span-5 flex flex-col justify-between gap-3 border-b md:border-b-0 md:border-r border-slate-800/80 pb-3 md:pb-0 md:pr-5">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+              </span>
+              <span className="text-[10px] font-mono text-cyan-400 font-extrabold tracking-widest uppercase">
+                {selectedLotteryName} DRAW SCHEDULE HIGHLIGHT
+              </span>
+            </div>
+
+            <div>
+              <div className="flex items-baseline gap-2.5 mt-0.5">
+                <h2 className="text-sm sm:text-base font-black text-slate-105 flex items-center gap-1.5 leading-none">
+                  <Calendar className="w-4 h-4 text-cyan-400" />
+                  <span>Wed, June 17, 2026</span>
+                </h2>
+                <span className="text-[10px] font-mono text-slate-500 font-bold">10:30 PM EST</span>
+              </div>
+              <p className="text-[10px] font-mono text-slate-400 mt-1 leading-normal">
+                Next official prize pools estimated at $5,000,000 Main + $1,000,000 Gold Ball.
+              </p>
+            </div>
+
+            {/* Countdown compact timer */}
+            <div className="flex items-center gap-4 bg-slate-950/80 border border-slate-900 px-3.5 py-1.5 rounded-lg border-l-2 border-l-cyan-400 self-start">
+              <Clock className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+              <div className="flex items-center gap-2 font-mono text-[11px] font-bold text-slate-200">
+                <span>REMAINING:</span>
+                <span className="text-cyan-400 font-extrabold">
+                  {countdown.days > 0 ? `${countdown.days}d ` : ''}
+                  {countdown.hours < 10 ? `0${countdown.hours}` : countdown.hours}h :{' '}
+                  {countdown.minutes < 10 ? `0${countdown.minutes}` : countdown.minutes}m :{' '}
+                  {countdown.seconds < 10 ? `0${countdown.seconds}` : countdown.seconds}s
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Column 2 - Fast Past 3 Drawings reference (7 cols) */}
+          <div className="md:col-span-7 flex flex-col justify-between gap-3 md:pl-2">
+            <div className="flex items-center justify-between pb-1">
+              <span className="text-[10px] font-mono text-slate-400 font-extrabold tracking-widest uppercase flex items-center gap-1.5">
+                <HistoryIcon className="w-3.5 h-3.5 text-slate-400" />
+                <span>PAST 3 DRAWS (REFERENCE)</span>
+              </span>
+              <button 
+                onClick={() => setActiveCategory('data')}
+                className="text-[9px] font-mono text-cyan-400 hover:underline hover:text-cyan-300 uppercase"
+              >
+                VIEW DATAFEED &rarr;
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {draws.slice(0, 3).map((d) => (
+                <div key={d.id} className="bg-slate-950/70 border border-slate-900/95 rounded-xl p-2.5 flex flex-col justify-between gap-1.5 hover:border-cyan-500/10 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[8px] font-mono font-bold text-slate-500">ID: 0{d.id}</span>
+                    <span className="text-[9px] font-mono text-purple-400 font-extrabold">{d.date.substring(5)}</span>
+                  </div>
+                  
+                  {/* Small sequence line */}
+                  <div className="flex gap-1 justify-start">
+                    {d.numbers.map(n => (
+                      <span 
+                        key={n} 
+                        className="w-5 h-5 rounded-full bg-slate-900 border border-purple-500/20 text-slate-300 font-sans font-black text-[9px] flex items-center justify-center shrink-0"
+                      >
+                        {n}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* SIMPLE ACCESSIBILITY PREDICTOR FOR BASIC USERS */}
+        {activeCategory === 'simple' && (
+          <SimplePredictorDeck
+            draws={draws}
+            activeProposedNumbers={proposedNumbers}
+            playSpeech={playSpeech}
+            isTTSEnabled={isTTSEnabled}
+            addToast={addToast}
+            onApplyNumbers={(nums) => setProposedNumbers(nums)}
+          />
+        )}
+
+        {/* AI AGENT SWARMS FOR COLLABORATIVE MULTI-PATTERN ANALYSIS */}
+        {activeCategory === 'swarms' && (
+          <AgentSwarmEngine
+            draws={draws}
+            playSpeech={playSpeech}
+            isTTSEnabled={isTTSEnabled}
+            addToast={addToast}
+            onApplyNumbers={(nums) => setProposedNumbers(nums)}
+          />
+        )}
 
         {/* INSIGHTS & SUMMARY HUB */}
         {activeCategory === 'summary' && (
@@ -6415,13 +6674,46 @@ export default function App() {
                 >
                   <span className="text-[8px] font-mono text-slate-500 mb-0.5">{m.role.toUpperCase()} // {m.timestamp}</span>
                   <div 
-                    className={`rounded-xl p-3 text-xs leading-relaxed font-mono ${
+                    className={`rounded-xl p-3 text-xs leading-relaxed font-mono relative overflow-hidden ${
                       m.role === 'user' 
                         ? 'bg-cyan-950/40 text-cyan-200 border border-cyan-500/30 rounded-tr-none' 
                         : 'bg-slate-950 text-slate-300 border border-slate-900 rounded-tl-none shadow-[0_4px_12px_rgba(2,6,23,0.3)]'
                     }`}
                   >
-                    {m.content}
+                    <div className="whitespace-pre-wrap">{m.content}</div>
+
+                    {/* Integrated dynamic citations panel */}
+                    {m.webSources && m.webSources.length > 0 && (
+                      <div className="mt-3.5 pt-2.5 border-t border-slate-800/60 flex flex-col gap-1.5 w-full">
+                        <span className="text-[7.5px] font-mono text-cyan-500/60 uppercase tracking-widest block font-extrabold flex items-center gap-1">
+                          <Network className="w-2.5 h-2.5 text-cyan-500/60" />
+                          <span>GROUNDED RESEARCH SOURCES:</span>
+                        </span>
+                        <div className="flex flex-wrap gap-1.5 mt-0.5">
+                          {m.webSources.slice(0, 3).map((source, idx) => (
+                            <a
+                              key={idx}
+                              href={source.uri}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[8.5px] text-cyan-400 hover:text-cyan-300 bg-cyan-950/20 hover:bg-cyan-950/50 border border-cyan-500/10 px-2 py-0.5 rounded flex items-center gap-1 font-mono transition-all duration-300"
+                            >
+                              <ExternalLink className="w-2.5 h-2.5 text-cyan-500/80" />
+                              <span className="truncate max-w-[140px]">{source.title}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Commands execution log display */}
+                    {m.commandExecuted && (
+                      <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center gap-2 text-[8px] font-mono text-emerald-400 bg-emerald-950/10 px-2 py-1 rounded border border-emerald-500/10">
+                        <Cpu className="w-3 h-3 text-emerald-400 animate-pulse" />
+                        <span className="uppercase font-extrabold">[{m.commandExecuted.name}]:</span>
+                        <span className="text-slate-400 font-medium">{m.commandExecuted.info}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -6489,6 +6781,20 @@ export default function App() {
 
           </div>
         </section>
+        )}
+
+        {/* 🌌 STRING WIREFRAME 3D SECTION */}
+        {activeCategory === 'string3d' && (
+          <section className="flex flex-col gap-5 w-full">
+            <QuantumStringTabSpace 
+              draws={draws}
+              activeProposedNumbers={proposedNumbers}
+              onApplyNumbers={(nums) => setProposedNumbers(nums)}
+              playSpeech={playSpeech}
+              isTTSEnabled={isTTSEnabled}
+              addToast={(title, message, type) => addToast(title, message, type as any)}
+            />
+          </section>
         )}
 
       </main>
@@ -6615,6 +6921,15 @@ export default function App() {
            </div>
         )}
       </AnimatePresence>
+
+      {/* FLOATING AI SENTIENT ASSISTANT MAIN OVERLAY */}
+      <FloatingAgentJarvis 
+        playSpeech={playSpeech}
+        isTTSEnabled={isTTSEnabled}
+        onToggleTTS={() => setIsTTSEnabled(!isTTSEnabled)}
+        onApplyNumbers={(nums) => setProposedNumbers(nums)}
+        addToast={addToast}
+      />
 
     </div>
   );

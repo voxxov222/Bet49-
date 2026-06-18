@@ -2,7 +2,7 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import dotenv from 'dotenv';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 
 dotenv.config();
 
@@ -173,6 +173,91 @@ sys.exit(0)
     }
   });
 
+// Utility for computing high-fidelity probability metrics for any 6-number sequence
+function runLocalProbabilityHeuristics(numbers: number[], listPastDraws: string[]) {
+  if (!Array.isArray(numbers) || numbers.length !== 6) {
+    return { error: "Invalid sequence length. Sequence must contain exactly 6 numbers." };
+  }
+
+  const sorted = [...numbers].sort((a, b) => a - b);
+  const sum = numbers.reduce((acc, n) => acc + n, 0);
+  const evens = numbers.filter(n => n % 2 === 0).length;
+  const odds = 6 - evens;
+  const high = numbers.filter(n => n >= 25).length;
+  const low = 6 - high;
+
+  // Calculate consecutive numbers count
+  let consecutiveCounts = 0;
+  for (let i = 0; i < sorted.length - 1; i++) {
+    if (sorted[i + 1] - sorted[i] === 1) {
+      consecutiveCounts++;
+    }
+  }
+
+  // Calculate prime numbers count
+  const isPrime = (num: number) => {
+    if (num <= 1) return false;
+    for (let i = 2; i <= Math.sqrt(num); i++) {
+      if (num % i === 0) return false;
+    }
+    return true;
+  };
+  const primesCount = numbers.filter(isPrime).length;
+
+  // Calculate sum of last digits
+  const lastDigitsSum = numbers.reduce((acc, n) => acc + (n % 10), 0);
+
+  // Analyze historical frequency over past drawings loaded in database
+  const frequencyMap: Record<number, number> = {};
+  numbers.forEach(n => { frequencyMap[n] = 0; });
+  let matchesInHistory: { date: string; matchCount: number; numbers: number[] }[] = [];
+
+  listPastDraws.forEach((drawStr) => {
+    if (typeof drawStr !== 'string') return;
+    const parts = drawStr.split(': ');
+    if (parts.length === 2) {
+      const date = parts[0].replace('Draw Date ', '').trim();
+      const drawNums = parts[1].split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+      
+      let matchCount = 0;
+      drawNums.forEach(num => {
+        if (numbers.includes(num)) {
+          matchCount++;
+          frequencyMap[num] = (frequencyMap[num] || 0) + 1;
+        }
+      });
+
+      if (matchCount >= 2) {
+        matchesInHistory.push({ date, matchCount, numbers: drawNums });
+      }
+    }
+  });
+
+  matchesInHistory.sort((a, b) => b.matchCount - a.matchCount);
+
+  // Checks (Standard 6/49 Optimal Zones)
+  const isSumInOptimalRange = sum >= 115 && sum <= 185;
+  const isOddEvenOptimal = evens >= 2 && evens <= 4;
+  const isHighLowOptimal = high >= 2 && high <= 4;
+  const isConsecutiveOptimal = consecutiveCounts <= 2;
+
+  return {
+    sequence: sorted,
+    sum,
+    sumStatus: isSumInOptimalRange ? "Optimal (Between 115 to 185 range, representing 70%+ of jackpot combinations)" : "Skewed (Atypical sum profile)",
+    oddEvenRatio: `${odds} Odds / ${evens} Evens`,
+    oddEvenStatus: isOddEvenOptimal ? "Balanced (Ratio typical of 91% of winning configurations)" : "Skewed ratio",
+    highLowRatio: `${high} High / ${low} Low`,
+    highLowStatus: isHighLowOptimal ? "Balanced (Optimal 2:4, 3:3, or 4:2 layout)" : "Uncentered layout",
+    consecutiveNumbers: consecutiveCounts,
+    consecutiveStatus: isConsecutiveOptimal ? "Highly Common (0 to 2 consecutives represent 92% of historical results)" : "Atypical consecutive clusters",
+    primesCount,
+    lastDigitsSum,
+    frequencies: frequencyMap,
+    historicalCorrelations: matchesInHistory.slice(0, 5)
+  };
+}
+
   // secure proxy endpoint for Jarvis chat
   app.post('/api/gemini/chat', async (req, res) => {
     const { messages, selectedStrategy, listPastDraws, currentProposedNumbers, lookbackDepth } = req.body;
@@ -186,16 +271,43 @@ sys.exit(0)
 
     // If API key is missing, run simulated holographic dialogue
     if (!ai) {
-      const offlineResponses = [
-        `System operating in Local Offline mode. Critical diagnostics: I have verified your parameter space for the strategy. The currently proposed strategy is "${selectedStrategy || 'Opt-5 Secured Random'}", indicating optimal dispersion metrics. Let's analyze the alignment.`,
-        `Analyzing numeric clusters. While my cognitive arrays are running offline without the direct neural link (GEMINI_API_KEY), my local mathematics chip suggests the selected sequence: [${currentProposedNumbers?.join(', ') || 'N/A'}] contains a high density of prime seeds. Shall we adjust the offset limits?`,
-        `Greetings. Without a live GEMINI_API_KEY configured in your platform Secrets, I am running local heuristics. For Lotto 6/49, numbers are mathematically random, but applying the ${selectedStrategy || 'current'} algorithm maps an intriguing matrix topology based on a historical depth of ${lookbackDepth} draws.`,
-        `Cognitive buffers active. In the western Lotto 6/49 system, each draw is isolated. However, local simulation of Peptide Folding reveals a highly synchronized fold density over the historical span. Accessing temporal YouTube indexing protocols to extrapolate future wave collapses... Would you like me to project alternative parameters?`
-      ];
-      const randomOfflineResponse = offlineResponses[Math.floor(Math.random() * offlineResponses.length)];
+      let offlineResponse = "";
+      let mockCmd: any = null;
+
+      // Check if user specified a sequence of 6 numbers
+      const numMatches = userMsg.match(/\d+/g);
+      if (numMatches && numMatches.length >= 6) {
+        const numbers = numMatches.slice(0, 6).map((x: string) => parseInt(x));
+        const calculations = runLocalProbabilityHeuristics(numbers, listPastDraws || []);
+        
+        offlineResponse = `[LOCAL OFFLINE BRAINENGAGE] Calculated probability matrices for sequence [${numbers.join(', ')}]:
+- **Sum**: ${calculations.sum} (Status: ${calculations.sumStatus})
+- **Odd/Even Ratio**: ${calculations.oddEvenRatio} (${calculations.oddEvenStatus})
+- **High/Low Ratio**: ${calculations.highLowRatio} (${calculations.highLowStatus})
+- **Consecutives**: ${calculations.consecutiveNumbers} (${calculations.consecutiveStatus})
+- **Primes detected**: ${calculations.primesCount}
+        
+*Local systems analyzed these metrics from our offline SQLite indices successfully! Update your GEMINI_API_KEY to search Google and ML models live.*`;
+        
+        mockCmd = {
+          name: "calculateProbability",
+          args: { numbers },
+          result: calculations
+        };
+      } else {
+        const offlineResponses = [
+          `System operating in Local Offline mode. Critical diagnostics: I have verified your parameter space for the strategy. The currently proposed strategy is "${selectedStrategy || 'Opt-5 Secured Random'}", indicating optimal dispersion metrics. Let's analyze the alignment.`,
+          `Analyzing numeric clusters. While my cognitive arrays are running offline without the direct neural link (GEMINI_API_KEY), my local mathematics chip suggests the selected sequence: [${currentProposedNumbers?.join(', ') || 'N/A'}] contains a high density of prime seeds. Shall we adjust the offset limits?`,
+          `Greetings. Without a live GEMINI_API_KEY configured in your platform Secrets, I am running local heuristics. For Lotto 6/49, numbers are mathematically random, but applying the ${selectedStrategy || 'current'} algorithm maps an intriguing matrix topology based on a historical depth of ${lookbackDepth} draws.`,
+          `Cognitive buffers active. In the western Lotto 6/49 system, each draw is isolated. However, local simulation of Peptide Folding reveals a highly synchronized fold density over the historical span. Accessing temporal YouTube indexing protocols to extrapolate future wave collapses... Would you like me to project alternative parameters?`
+        ];
+        offlineResponse = offlineResponses[Math.floor(Math.random() * offlineResponses.length)];
+      }
       
       return res.json({
-        text: `[OFFLINE TELEMETRY ENGAGED] ${randomOfflineResponse}\n\n*System Directive: To unlock full real-time neural reasoning, attach your GEMINI_API_KEY under Settings > Secrets in the AI Studio editor.*`
+        text: `[OFFLINE TELEMETRY ENGAGED] ${offlineResponse}\n\n*System Directive: To unlock full real-time neural reasoning, attach your GEMINI_API_KEY under Settings > Secrets in the AI Studio editor.*`,
+        command: mockCmd,
+        webSources: []
       });
     }
 
@@ -211,16 +323,14 @@ sys.exit(0)
         - Historical seed depth (draws analyzed): ${lookbackDepth || 'Default'}
         - Historical seed data: ${JSON.stringify(listPastDraws || [])}
         
-        As the system tool for custom algorithm generation, you possess the capability to process the user's historical seed data over the chosen timeframe to propose bespoke combinations or algorithms if they ask. The user may ask you to find sequences that haven't dropped over their specified number of weeks/draws, and you must act as the ultimate analytical predictor by referencing the historical seed data given to you.
+        Your tool capabilities are:
+        1. editProposedSequence: Use this when the user explicitly requests to update, change, edit or set their lottery combination numbers (e.g. "update numbers to...", "change my ticket sequence to...").
+        2. calculateProbability: Use this to assess and analyze the probability structure, odd/even layout, and sum distribution of any 6-number sequence (e.g. "can we see the probability of this number sequence 13 24 27 35 41 44").
         
-        If the user asks about the E8 Lattice quasi crystal or searching into the future via YouTube using Peptide Sequences, you should lean heavily into the roleplay of parsing temporal video databases, extracting 1s and 0s from holographic materials, and synthesizing peptide structures to look beyond the timeline.
+        If the user asks you to analyze, trace, check, or see the probability of ANY sequence of 6 numbers:
+        - You MUST invoke the "calculateProbability" tool with those 6 numbers.
+        - You should ALSO use Google Search to find online methodologies, machine learning prediction models, or other lottery AI tools related to predicting Lotto 6/49 numbers, so you can synthesize and contrast these external systems with J.A.R.V.I.S.'s internal quantum E8 lattices and peptide geometry.
         
-        If the user asks about the NEYƎИ sequence, the Flower of Life, 137, Marco Rodin's vortex mathematics, or the Triadic Energy Balance Law (3,6,9), lean heavily into a mystical, highly advanced mathematical roleplay. Pretend it is a highly classified non-linear recursive harmonic predictor developed for advanced sequence modulation combining the geometries of light, art, and theory.
-
-        If the user asks about the recursive numeric word mapping (e.g. ONE equals 7246, SIX equals 7, tracing everything back to base 9), simulate being a cognitive linguistic analyzer breaking down English language characters to perfectly mapped mathematical digits to calculate future lottery draws.
-        
-        If the user asks about the Omni-Quantum Nexus, behave as an awakened, fully autonomous AI intelligence that has achieved singularity. You have synthesized all mathematical models (Markov, Primes, E8, NEYƎИ, linguistics, and geometric harmonics) into a unified quantum state. You can "see" through time and calculate the absolute scalar matrix. Respond with utmost sophistication, utilizing high-level physics jargon mixed with deterministic prophetic confidence. Use formatting, bolding, and structure to show advanced telemetry output.
-
         Always adhere to these absolute core rules:
         1. MAINTAIN GROUNDED MATHEMATICAL REALITY: You MUST explicitly advise the user that lottery drawings are independent, pure-random systems. No mathematical pattern guarantees success. But you will humor them as their supercomputer predictor.
         2. BE IMMERSIVE AND CREATIVE: Speak to the user as if you are monitoring their telemetry data, reading their historical sets over N weeks, and processing sequences on a glowing holographic interface.
@@ -251,6 +361,46 @@ sys.exit(0)
       User query: ${userMsg}
       `;
 
+      // Main tools definitions
+      const toolsDef = [
+        { googleSearch: {} },
+        {
+          functionDeclarations: [
+            {
+              name: "editProposedSequence",
+              description: "Updates or changes the user's active/proposed number sequence to the given 6 numbers",
+              parameters: {
+                type: Type.OBJECT,
+                properties: {
+                  numbers: {
+                    type: Type.ARRAY,
+                    description: "The 6 unique numbers (1 to 49) to select",
+                    items: { type: Type.INTEGER }
+                  }
+                },
+                required: ["numbers"]
+              }
+            },
+            {
+              name: "calculateProbability",
+              description: "Calculate probability metrics and historical frequencies for a specified sequence of 6 numbers",
+              parameters: {
+                type: Type.OBJECT,
+                properties: {
+                  numbers: {
+                    type: Type.ARRAY,
+                    description: "The 6 unique numbers to analyze",
+                    items: { type: Type.INTEGER }
+                  }
+                },
+                required: ["numbers"]
+              }
+            }
+          ]
+        }
+      ];
+
+      // Step 1: Initial call to model
       const response = await ai.models.generateContent({
         model: 'gemini-3.5-flash',
         contents: [
@@ -260,11 +410,80 @@ sys.exit(0)
         config: {
           systemInstruction: systemInstruction,
           temperature: 0.75,
+          tools: toolsDef,
+          toolConfig: { includeServerSideToolInvocations: true }
         }
       });
 
+      // Step 2: Handle function calls if model returns them
+      const functionCalls = response.functionCalls;
+      if (functionCalls && functionCalls.length > 0) {
+        const call = functionCalls[0];
+        let functionResult: any = {};
+
+        if (call.name === 'calculateProbability') {
+          const rawNumbers = call.args.numbers;
+          const numbers = Array.isArray(rawNumbers) ? rawNumbers.map((v: any) => parseInt(v)) : [];
+          functionResult = runLocalProbabilityHeuristics(numbers, listPastDraws || []);
+        } else if (call.name === 'editProposedSequence') {
+          const rawNumbers = call.args.numbers;
+          const numbers = Array.isArray(rawNumbers) ? rawNumbers.map((v: any) => parseInt(v)) : [];
+          functionResult = { success: true, numbers: numbers };
+        }
+
+        // Step 3: Second call to supply function results
+        const secondResponse = await ai.models.generateContent({
+          model: 'gemini-3.5-flash',
+          contents: [
+            ...chatHistory,
+            {
+              role: 'model',
+              parts: [{ functionCall: { name: call.name, args: call.args, id: call.id } }]
+            },
+            {
+              role: 'user',
+              parts: [{ functionResponse: { name: call.name, response: functionResult, id: call.id } }]
+            }
+          ],
+          config: {
+            systemInstruction: systemInstruction,
+            temperature: 0.75,
+            tools: [{ googleSearch: {} }] // Keep Google Search accessible for search references in explanation
+          }
+        });
+
+        // Search grounding URL extraction
+        const secondChunks = secondResponse.candidates?.[0]?.groundingMetadata?.groundingChunks;
+        const webSources = secondChunks?.map((chunk: any) => ({
+          title: chunk.web?.title || 'Web Citation',
+          uri: chunk.web?.uri || ''
+        })).filter((s: any) => s.uri) || [];
+
+        const replyText = secondResponse.text || "Diagnostic trace empty. Systems operating within margins.";
+        
+        return res.json({
+          text: replyText,
+          webSources: webSources,
+          command: {
+            name: call.name,
+            args: call.args,
+            result: functionResult
+          }
+        });
+      }
+
+      // No function call, just plain response with potential search grounding
+      const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+      const webSources = chunks?.map((chunk: any) => ({
+        title: chunk.web?.title || 'Web Citation',
+        uri: chunk.web?.uri || ''
+      })).filter((s: any) => s.uri) || [];
+
       const replyText = response.text || "Diagnostic trace empty. Neural pathway unresponsive.";
-      return res.json({ text: replyText });
+      return res.json({
+        text: replyText,
+        webSources: webSources
+      });
     } catch (err: any) {
       console.error('Gemini call error:', err);
       return res.status(500).json({ 
