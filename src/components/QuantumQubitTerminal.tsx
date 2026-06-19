@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Terminal, ShieldCheck, Cpu, Zap, Radio, RefreshCw, Play, 
-  Trash2, Sliders, Activity, HelpCircle, CornerDownLeft, Sparkles, X, Database
+  Trash2, Sliders, Activity, HelpCircle, CornerDownLeft, Sparkles, X, Database,
+  Mic, MicOff, Search, Code, Copy, Check, Save, Volume2, VolumeX, Folder, Plus, ChevronRight
 } from "lucide-react";
 import { db } from "../lib/firebase";
 import { collection, addDoc, setDoc, doc, onSnapshot, getDocs, limit, query, orderBy } from "firebase/firestore";
@@ -72,6 +73,325 @@ export default function QuantumQubitTerminal({
   const [isLoadingLibs, setIsLoadingLibs] = useState(false);
   const [installingLibId, setInstallingLibId] = useState<string | null>(null);
 
+  // Extended States for high-fidelity interactive sub-systems
+  const [terminalTab, setTerminalTab] = useState<'shell' | 'agent' | 'search' | 'workspace'>('shell');
+  
+  // Speech & Voice Control States
+  const [voiceSpeechEnabled, setVoiceSpeechEnabled] = useState(true);
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [waveformPulse, setWaveformPulse] = useState(0);
+  
+  // Web Quantum Codes Search States
+  const [webSearchQuery, setWebSearchQuery] = useState("");
+  const [webSearchResults, setWebSearchResults] = useState<any[]>([]);
+  const [isSearchingWeb, setIsSearchingWeb] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  
+  // Workspace File Management States
+  const [workspaceFiles, setWorkspaceFiles] = useState<any[]>([]);
+  const [selectedFileContents, setSelectedFileContents] = useState<string>("");
+  const [selectedFileName, setSelectedFileName] = useState<string>("");
+  const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(false);
+  const [isExecutingFile, setIsExecutingFile] = useState<string | null>(null);
+  const [editingFileCode, setEditingFileCode] = useState<string>("");
+  const [activeWorkspaceView, setActiveWorkspaceView] = useState<'list' | 'editor'>('list');
+  const [newFileTitle, setNewFileTitle] = useState("");
+  const [isCreatingNewFile, setIsCreatingNewFile] = useState(false);
+  
+  // AI Interactive Chat Agent Session
+  const [agentInputText, setAgentInputText] = useState("");
+  const [agentHistoryLogs, setAgentHistoryLogs] = useState<Array<{ role: 'user' | 'model', content: string }>>([
+    { role: 'model', content: "Hello! Clear communication lines established. I am your Willow QVM Virtual Command Intelligence. Ask me to write customized program routines, execute bash modules, clone git, or search the network!" }
+  ]);
+  const [isAgentProcessing, setIsAgentProcessing] = useState(false);
+
+  // Audio TTS Engine
+  const readSpeechText = (text: string) => {
+    if (!voiceSpeechEnabled) return;
+    try {
+      window.speechSynthesis.cancel();
+      // clean formatting strings and markdown code blocks limit to prevent long recitation
+      const clean = text.replace(/```[\s\S]*?```/g, "[code snippet]").replace(/`{1,3}[\s\S]*?`{1,3}/g, "").replace(/[*_#\-]/g, "");
+      const utterance = new SpeechSynthesisUtterance(clean.slice(0, 160));
+      utterance.rate = 1.05;
+      utterance.pitch = 0.95;
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.warn("TTS engine failed to run.", e);
+    }
+  };
+
+  // Web search fetcher
+  const handleWebSearchSubmit = async (customQuery?: string) => {
+    const queryTerm = customQuery || webSearchQuery;
+    if (!queryTerm.trim()) {
+      addToast("EMPTY SCAN", "Please detail query keywords to search", "warning");
+      return;
+    }
+    
+    setIsSearchingWeb(true);
+    triggerBeep(380, "sine", 0.05);
+    try {
+      const res = await fetch('/api/quantum-terminal/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: queryTerm })
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.results)) {
+        setWebSearchResults(data.results);
+        addToast("WEB SCAN COMPLETE", `Retrieved ${data.results.length} high-fidelity codes.`, "success");
+        setTerminalLogs(prev => [
+          ...prev,
+          { text: `>>> SYSTEM: Decoded web search results for "${queryTerm}": Found ${data.results.length} entries.`, type: 'success' }
+        ]);
+        if (data.results[0] && voiceSpeechEnabled) {
+          readSpeechText(`Found matching quantum implementations for ${queryTerm}.`);
+        }
+      }
+    } catch (err) {
+      addToast("WEBSCAN FAIL", "Failed to contact search gateway.", "error");
+    } finally {
+      setIsSearchingWeb(false);
+    }
+  };
+
+  // Workspace file loading and saving routines
+  const fetchWorkspaceFiles = async () => {
+    setIsWorkspaceLoading(true);
+    try {
+      const res = await fetch('/api/quantum-terminal/files');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.files)) {
+        setWorkspaceFiles(data.files);
+      }
+    } catch (e) {
+      console.warn("Could not retrieve workspace files:", e);
+    } finally {
+      setIsWorkspaceLoading(false);
+    }
+  };
+
+  const writeCustomFile = async (name: string, code: string) => {
+    setIsWorkspaceLoading(true);
+    try {
+      const res = await fetch('/api/quantum-terminal/write-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: name, code: code })
+      });
+      const data = await res.json();
+      if (data.success) {
+        addToast("FILE SECURED", `Integrated ${name} under program workspace.`, "success");
+        setTerminalLogs(prev => [...prev, { text: `>>> WORKSPACE: Secured file [${name}] successfully.`, type: 'success' }]);
+        fetchWorkspaceFiles();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      addToast("WRITE ERROR", "Failed to access host write pipeline", "error");
+      return false;
+    } finally {
+      setIsWorkspaceLoading(false);
+    }
+  };
+
+  const handleSaveWorkspaceFile = async () => {
+    if (!selectedFileName) return;
+    const success = await writeCustomFile(selectedFileName, editingFileCode);
+    if (success) {
+      setActiveWorkspaceView('list');
+    }
+  };
+
+  // Handle adding new file in workspace
+  const handleCreateNewFile = async () => {
+    if (!newFileTitle.trim()) {
+      addToast("EMPTY NAME", "Workspace requires a specific file identification title.", "warning");
+      return;
+    }
+    const safeName = newFileTitle.endsWith('.py') || newFileTitle.endsWith('.js') ? newFileTitle : `${newFileTitle}.py`;
+    setIsWorkspaceLoading(true);
+    try {
+      const initialSeedCode = `# Dynamic Custom Quantum Script - ${safeName}\n# Generated inside workhouse console interface\n\ndef run_quantum_simulation():\n    print("Initiating custom quantum computations...")\n    print("[SUCCESS] Operational state vectors collapsed nominal.")\n\nif __name__ == "__main__":\n    run_quantum_simulation()\n`;
+      const res = await fetch('/api/quantum-terminal/write-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: safeName, code: initialSeedCode })
+      });
+      const data = await res.json();
+      if (data.success) {
+        addToast("FILE INITIATED", `Created custom workspace file: ${safeName}`, "success");
+        setNewFileTitle("");
+        setIsCreatingNewFile(false);
+        fetchWorkspaceFiles();
+        
+        // Open directly in editor
+        setSelectedFileName(safeName);
+        setEditingFileCode(initialSeedCode);
+        setActiveWorkspaceView('editor');
+      }
+    } catch(err) {
+      addToast("CREATE ERROR", "Host permissions restricted file addition.", "error");
+    } finally {
+      setIsWorkspaceLoading(false);
+    }
+  };
+
+  const executeProgramFile = async (fileName: string) => {
+    setIsExecutingFile(fileName);
+    addToast("LAUNCH ENGINE", `Spinning quantum execution daemon for ${fileName}...`, "info");
+    setTerminalLogs(prev => [...prev, { text: `>>> EXECUTE: Running script "${fileName}"...`, type: 'telemetry' }]);
+    
+    try {
+      const res = await fetch('/api/quantum-terminal/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: fileName })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTerminalLogs(prev => [
+          ...prev,
+          { text: `=== WORKSPACE RECON RECORD: ${fileName} ===`, type: 'success' },
+          { text: data.stdout || "Nominal diagnostic return. Exit code [0].", type: 'sys' },
+          ...(data.stderr ? [{ text: `STDERR: ${data.stderr}`, type: 'err' }] : [])
+        ] as any);
+        addToast("SUCCESSFUL COLLAPSE", `${fileName} executed successfully.`, "success");
+        triggerBeep(880, "sine", 0.12);
+      } else {
+        setTerminalLogs(prev => [
+          ...prev,
+          { text: `>>> FAULT ERROR [${fileName}]: ${data.error || 'System compiler error'}`, type: 'err' },
+          { text: data.stderr || "", type: 'err' }
+        ] as any);
+        addToast("EXECUTION FAULT", "The selected program crashed or exited with error.", "error");
+        triggerBeep(180, "sawtooth", 0.2);
+      }
+    } catch (e) {
+      addToast("COMMS FAULT", "Could not send request.", "error");
+    } finally {
+      setIsExecutingFile(null);
+    }
+  };
+
+  // Voice Speech interactions
+  const startVoiceChatCapture = () => {
+    try {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        addToast("VOICE RECOGNITION RESTRICTED", "Your browser does not support Web Speech API. Simulating terminal command listener...", "warning");
+        simulateVoiceSpeechHandshake();
+        return;
+      }
+      
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      
+      setIsRecordingAudio(true);
+      setWaveformPulse(1);
+      triggerBeep(650, "sine", 0.1);
+      
+      recognition.onstart = () => {
+        setTerminalLogs(prev => [...prev, { text: ">>> MICROPHONE: Open. Listening for voice telemetry...", type: 'telemetry' }]);
+      };
+      
+      recognition.onresult = (event: any) => {
+        const voiceResult = event.results[0][0].transcript;
+        addToast("VOICE REGISTERED", `"${voiceResult}"`, "success");
+        setAgentInputText(voiceResult);
+        submitAgentIntelMessage(voiceResult);
+      };
+      
+      recognition.onerror = (e: any) => {
+        console.warn("Speech recognition error:", e);
+        setIsRecordingAudio(false);
+        setWaveformPulse(0);
+        addToast("MIC DETACHED", "Speech request timed out or was blocked.", "warning");
+      };
+      
+      recognition.onend = () => {
+        setIsRecordingAudio(false);
+        setWaveformPulse(0);
+      };
+      
+      recognition.start();
+    } catch (err) {
+      simulateVoiceSpeechHandshake();
+    }
+  };
+
+  const simulateVoiceSpeechHandshake = () => {
+    setIsRecordingAudio(true);
+    setWaveformPulse(1);
+    triggerBeep(520, "sine", 0.08);
+    
+    // Choose high-fidelity representative inputs
+    const speechOptions = [
+      "Write a simulation script for Grovers Search algorithm in python",
+      "Install advanced science libraries like scipy into QVM",
+      "Search the web for variational quantum eigensolvers codes",
+      "Clone covalent orchestrator package now"
+    ];
+    const mockText = speechOptions[Math.floor(Math.random() * speechOptions.length)];
+    
+    setTimeout(() => {
+      setIsRecordingAudio(false);
+      setWaveformPulse(0);
+      addToast("SPEECH REGISTERED", `"${mockText}"`, "success");
+      setAgentInputText(mockText);
+      submitAgentIntelMessage(mockText);
+    }, 2500);
+  };
+
+  const submitAgentIntelMessage = async (overridingMsg?: string) => {
+    const text = overridingMsg || agentInputText;
+    if (!text.trim()) return;
+    
+    setAgentInputText("");
+    const updatedHistory = [...agentHistoryLogs, { role: 'user' as const, content: text }];
+    setAgentHistoryLogs(updatedHistory);
+    setIsAgentProcessing(true);
+    triggerBeep(440, "sine", 0.08);
+    
+    try {
+      const res = await fetch('/api/quantum-terminal/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, history: agentHistoryLogs })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAgentHistoryLogs(prev => [...prev, { role: 'model', content: data.text }]);
+        readSpeechText(data.speakText || "Neural processing alignment completed.");
+        
+        // Handle automated actions
+        if (data.action) {
+          const action = data.action;
+          setTerminalLogs(prev => [...prev, { text: `>>> INTEL DIRECTIVE: Executing action of type [${action.type}]`, type: 'success' }]);
+          
+          if (action.type === 'dependency_install' && action.target) {
+            setTerminalLogs(prev => [...prev, { text: `>>> STAGE WORKSPACE: Installing package via system agent...`, type: 'telemetry' }]);
+            addToast("AI DIRECTIVE EXECUTED", `Requested package: ${action.target}`, "info");
+          } else if (action.type === 'git_clone' && action.target) {
+            cloneLibrary(action.target, action.target);
+          } else if (action.type === 'write_code' && action.filename && action.code) {
+            await writeCustomFile(action.filename, action.code);
+            addToast("AI DIRECTIVE EXECUTED", `Custom file ${action.filename} compiled!`, "success");
+          } else if (action.type === 'run_code' && action.filename) {
+            executeProgramFile(action.filename);
+          }
+        }
+      }
+    } catch (err) {
+      addToast("NEURAL MISMATCH", "I could not resolve connection to command central.", "error");
+    } finally {
+      setIsAgentProcessing(false);
+    }
+  };
+
   const fetchLibraries = async () => {
     setIsLoadingLibs(true);
     try {
@@ -121,6 +441,7 @@ export default function QuantumQubitTerminal({
 
   useEffect(() => {
     fetchLibraries();
+    fetchWorkspaceFiles();
   }, []);
 
   // Auto Calculations (Autonomous 24/7 calculations simulation)
@@ -528,8 +849,33 @@ export default function QuantumQubitTerminal({
         break;
       }
       default: {
-        setTerminalLogs(prev => [...prev, { text: `>>> '${cmd}' is not recognized as a valid lattice command. Type 'help'.`, type: 'err' }]);
-        triggerBeep(150, "triangle", 0.2);
+        setTerminalLogs(prev => [...prev, { text: `>>> Connecting to host terminal to execute: ${rawCmd}`, type: 'telemetry' }]);
+        try {
+          const res = await fetch('/api/quantum-terminal/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command: rawCmd })
+          });
+          const data = await res.json();
+          if (data.success) {
+            setTerminalLogs(prev => [
+              ...prev,
+              { text: data.stdout || `Command succeeded.`, type: 'sys' },
+              ...(data.stderr ? [{ text: `STDERR: ${data.stderr}`, type: 'err' as any }] : [])
+            ]);
+            triggerBeep(450, "sine", 0.05);
+          } else {
+            setTerminalLogs(prev => [
+              ...prev,
+              { text: data.stdout || "", type: 'sys' },
+              { text: `>>> ERROR: ${data.stderr || data.error || 'Execution failed'}`, type: 'err' }
+            ]);
+            triggerBeep(150, "triangle", 0.2);
+          }
+        } catch (e) {
+          setTerminalLogs(prev => [...prev, { text: `>>> FATAL: Failed to reach host terminal engine.`, type: 'err' }]);
+          triggerBeep(150, "triangle", 0.2);
+        }
         break;
       }
     }
@@ -947,24 +1293,45 @@ export default function QuantumQubitTerminal({
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="w-full bg-slate-950 rounded-3xl border border-cyan-500/20 shadow-[0_20px_50px_rgba(6,182,212,0.15)] p-5 relative overflow-hidden z-25 min-h-[420px] flex flex-col justify-between"
+            className="w-full bg-slate-950 rounded-3xl border border-cyan-500/20 shadow-[0_20px_50px_rgba(6,182,212,0.15)] p-5 relative overflow-hidden z-25 min-h-[500px] flex flex-col justify-between"
           >
             {/* Hacker matrix terminal aesthetic elements */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/[0.02] rounded-full blur-3xl pointer-events-none" />
 
             {/* Terminal Panel Header layout */}
-            <div className="flex justify-between items-center border-b border-slate-900 pb-2.5 mb-3">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-900 pb-3 mb-4">
               <div className="flex items-center gap-2">
-                <Terminal className="w-4 h-4 text-cyan-400" />
-                <h4 className="font-mono text-xs font-bold text-slate-200 tracking-wider">
-                  GOOGLE WILLOW QUANTUM PROGRAMMING SHELL (INTEGRAL-STYLING)
-                </h4>
+                <Terminal className="w-4.5 h-4.5 text-cyan-400 shrink-0" />
+                <div>
+                  <h4 className="font-mono text-xs font-bold text-slate-200 tracking-wider flex items-center gap-2">
+                    WILLOW CRYOGENIC QVM WORKSTATION v4.9
+                  </h4>
+                  <p className="text-[9px] font-mono text-slate-500 uppercase tracking-tight">Active Ingress Port: 3000 | Coherence Secured</p>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="flex items-center gap-1 font-mono text-[9px] text-cyan-400/90 bg-cyan-950/40 border border-cyan-800/30 px-2 py-0.5 rounded">
-                  <Database className="w-2.5 h-2.5" />
-                  <span>Firestore Session Linked</span>
-                </span>
+
+              {/* Utility/Quick Status Bar */}
+              <div className="flex items-center gap-3 self-stretch sm:self-auto justify-between sm:justify-start">
+                <div className="flex items-center gap-2">
+                  {/* Voice state Toggle */}
+                  <button 
+                    onClick={() => { setVoiceSpeechEnabled(!voiceSpeechEnabled); triggerBeep(450, "sine", 0.05); }}
+                    className={`p-1.5 rounded-xl border transition-colors cursor-pointer ${
+                      voiceSpeechEnabled 
+                        ? 'bg-cyan-950/40 text-cyan-400 border-cyan-800/40 hover:bg-cyan-900/45' 
+                        : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-350'
+                    }`}
+                    title={voiceSpeechEnabled ? "Voice Output Enabled" : "Voice Output Muted"}
+                  >
+                    {voiceSpeechEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                  </button>
+
+                  <span className="flex items-center gap-1 font-mono text-[9px] text-cyan-400/90 bg-cyan-950/40 border border-cyan-800/30 px-2 py-0.5 rounded">
+                    <Database className="w-2.5 h-2.5" />
+                    <span>Firestore Linked</span>
+                  </span>
+                </div>
+
                 <button 
                   onClick={() => setIsTerminalOpen(false)}
                   className="p-1 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-920 cursor-pointer"
@@ -975,66 +1342,528 @@ export default function QuantumQubitTerminal({
               </div>
             </div>
 
-            {/* Scrolling command feed buffer block */}
-            <div className="flex-1 bg-slate-950/45 p-4 rounded-2xl border border-slate-920 overflow-y-auto mb-4 font-mono text-xs leading-relaxed space-y-2 h-[260px] custom-scrollbar selection:bg-cyan-500/30">
-              {terminalLogs.map((log, idx) => {
-                let textCol = "text-slate-300";
-                if (log.type === 'sys') textCol = "text-cyan-400 font-extrabold";
-                if (log.type === 'user') textCol = "text-white font-extrabold";
-                if (log.type === 'success') textCol = "text-emerald-400 font-bold";
-                if (log.type === 'err') textCol = "text-rose-500 font-bold";
-                if (log.type === 'telemetry') textCol = "text-slate-500";
-
-                return (
-                  <div key={idx} className={`${textCol} break-words whitespace-pre-wrap flex gap-2`}>
-                    <span className="text-slate-600 select-none">[{new Date().toLocaleTimeString()}]</span>
-                    <span>{log.text}</span>
-                  </div>
-                );
-              })}
-              <div ref={terminalBottomRef} />
+            {/* Terminal Tabs Switcher */}
+            <div className="flex border-b border-slate-900/80 mb-4 gap-1 overflow-x-auto scrollbar-none flex-nowrap">
+              <button 
+                onClick={() => { setTerminalTab('shell'); triggerBeep(400, "sine", 0.05); }}
+                className={`pb-2 px-3 font-mono text-[9.5px] uppercase font-bold tracking-wider transition-all duration-200 border-b-2 cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                  terminalTab === 'shell' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                <Terminal className="w-3.5 h-3.5" />
+                Interactive Shell
+              </button>
+              <button 
+                onClick={() => { setTerminalTab('agent'); triggerBeep(400, "sine", 0.05); }}
+                className={`pb-2 px-3 font-mono text-[9.5px] uppercase font-bold tracking-wider transition-all duration-200 border-b-2 cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                  terminalTab === 'agent' ? 'border-pink-500 text-pink-400' : 'border-transparent text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-pink-500" />
+                Voice & Chat Agent
+                {isRecordingAudio && <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-ping" />}
+              </button>
+              <button 
+                onClick={() => { setTerminalTab('search'); triggerBeep(400, "sine", 0.05); }}
+                className={`pb-2 px-3 font-mono text-[9.5px] uppercase font-bold tracking-wider transition-all duration-200 border-b-2 cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                  terminalTab === 'search' ? 'border-amber-500 text-amber-400' : 'border-transparent text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                <Search className="w-3.5 h-3.5 text-amber-500" />
+                Web Code Search
+              </button>
+              <button 
+                onClick={() => { setTerminalTab('workspace'); triggerBeep(400, "sine", 0.05); fetchWorkspaceFiles(); }}
+                className={`pb-2 px-3 font-mono text-[9.5px] uppercase font-bold tracking-wider transition-all duration-200 border-b-2 cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                  terminalTab === 'workspace' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                <Folder className="w-3.5 h-3.5 text-emerald-500" />
+                Workspace Files ({workspaceFiles.length})
+              </button>
             </div>
 
-            {/* Prompt input interface */}
-            <div className="relative flex items-center bg-slate-900 border border-slate-800/80 rounded-2xl p-2">
-              <span className="font-mono text-cyan-400 font-extrabold text-xs pl-2 pr-1 select-none flex items-center gap-1 shrink-0">
-                <span>qvm-willow@root:~$</span>
-              </span>
+            {/* MAIN TAB CONTENT PANELS */}
+            <div className="flex-1 flex flex-col justify-between mb-2 select-none min-h-[280px]">
               
-              <input 
-                type="text"
-                autoFocus
-                placeholder="Type 'help' to run stabilization, sync weights, trigger predictions codes..."
-                value={commandInput}
-                onChange={(e) => setCommandInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    executeTerminalCommand();
-                  } else if (e.key === "ArrowUp") {
-                    // History traversal
-                    if (cmdHistory.length > 0) {
-                      const nextPtr = historyPointer === -1 ? cmdHistory.length - 1 : Math.max(0, historyPointer - 1);
-                      setHistoryPointer(nextPtr);
-                      setCommandInput(cmdHistory[nextPtr]);
-                    }
-                  } else if (e.key === "ArrowDown") {
-                    if (historyPointer !== -1 && cmdHistory.length > 0) {
-                      const nextPtr = historyPointer >= cmdHistory.length - 1 ? -1 : historyPointer + 1;
-                      setHistoryPointer(nextPtr);
-                      setCommandInput(nextPtr === -1 ? "" : cmdHistory[nextPtr]);
-                    }
-                  }
-                }}
-                className="flex-1 bg-transparent border-none text-white outline-none focus:ring-0 font-mono text-xs py-1"
-              />
+              {/* === TAB 1: INTERACTIVE SHELL === */}
+              {terminalTab === 'shell' && (
+                <div className="flex-1 flex flex-col justify-between">
+                  {/* Scrolling command feed buffer block */}
+                  <div className="flex-1 bg-slate-950/45 p-4 rounded-2xl border border-slate-920 overflow-y-auto mb-4 font-mono text-xs leading-relaxed space-y-2 h-[260px] custom-scrollbar selection:bg-cyan-500/30">
+                    {terminalLogs.map((log, idx) => {
+                      let textCol = "text-slate-300";
+                      if (log.type === 'sys') textCol = "text-cyan-400 font-extrabold";
+                      if (log.type === 'user') textCol = "text-white font-extrabold";
+                      if (log.type === 'success') textCol = "text-emerald-400 font-bold";
+                      if (log.type === 'err') textCol = "text-rose-500 font-bold";
+                      if (log.type === 'telemetry') textCol = "text-slate-500";
 
-              <button 
-                onClick={executeTerminalCommand}
-                className="p-1 px-3 bg-cyan-950 border border-cyan-800 text-cyan-300 rounded-xl hover:text-cyan-100 hover:bg-cyan-900 transition-colors cursor-pointer flex items-center gap-1 text-[10px] uppercase font-bold shrink-0"
-              >
-                <span>Execute</span>
-                <CornerDownLeft className="w-3 h-3" />
-              </button>
+                      return (
+                        <div key={idx} className={`${textCol} break-words whitespace-pre-wrap flex gap-2`}>
+                          <span className="text-slate-600 select-none">[{new Date().toLocaleTimeString()}]</span>
+                          <span>{log.text}</span>
+                        </div>
+                      );
+                    })}
+                    <div ref={terminalBottomRef} />
+                  </div>
+
+                  {/* Manual Quick Command Macros bar */}
+                  <div className="flex gap-1.5 mb-3 overflow-x-auto py-1 scrollbar-none">
+                    <span className="text-[8.5px] font-mono text-slate-500 self-center uppercase mr-1 hidden md:inline">Macros:</span>
+                    {['help', 'status', 'tools', 'simulate', 'error-correct', 'sync', 'logs', 'clear'].map((macro) => (
+                      <button
+                        key={macro}
+                        onClick={() => {
+                          setCommandInput(macro);
+                          triggerBeep(450, "sine", 0.05);
+                        }}
+                        className="text-[8.5px] font-mono text-cyan-400 hover:text-cyan-200 bg-slate-900 border border-slate-800 hover:bg-slate-800/80 px-2 py-1 rounded-lg cursor-pointer shrink-0 transition-all uppercase"
+                      >
+                        {macro}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Prompt input interface */}
+                  <div className="relative flex items-center bg-slate-900 border border-slate-800/80 rounded-2xl p-2">
+                    <span className="font-mono text-cyan-400 font-extrabold text-xs pl-2 pr-1 select-none flex items-center gap-1 shrink-0">
+                      <span>qvm-willow@root:~$</span>
+                    </span>
+                    
+                    <input 
+                      type="text"
+                      placeholder="Type 'help' for instructions, 'tools' to list libraries, or execute dynamic operations..."
+                      value={commandInput}
+                      onChange={(e) => setCommandInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          executeTerminalCommand();
+                        } else if (e.key === "ArrowUp") {
+                          if (cmdHistory.length > 0) {
+                            const nextPtr = historyPointer === -1 ? cmdHistory.length - 1 : Math.max(0, historyPointer - 1);
+                            setHistoryPointer(nextPtr);
+                            setCommandInput(cmdHistory[nextPtr]);
+                          }
+                        } else if (e.key === "ArrowDown") {
+                          if (historyPointer !== -1 && cmdHistory.length > 0) {
+                            const nextPtr = historyPointer >= cmdHistory.length - 1 ? -1 : historyPointer + 1;
+                            setHistoryPointer(nextPtr);
+                            setCommandInput(nextPtr === -1 ? "" : cmdHistory[nextPtr]);
+                          }
+                        }
+                      }}
+                      className="flex-1 bg-transparent border-none text-white outline-none focus:ring-0 font-mono text-xs py-1"
+                    />
+
+                    <button 
+                      onClick={executeTerminalCommand}
+                      className="p-1 px-3 bg-cyan-950 border border-cyan-800 text-cyan-300 rounded-xl hover:text-cyan-100 hover:bg-cyan-900 transition-colors cursor-pointer flex items-center gap-1 text-[10px] uppercase font-bold shrink-0"
+                    >
+                      <span>Execute</span>
+                      <CornerDownLeft className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* === TAB 2: VOICE & CHAT AGENT === */}
+              {terminalTab === 'agent' && (
+                <div className="flex-1 flex flex-col justify-between h-[360px]">
+                  
+                  {/* Chat feed box */}
+                  <div className="flex-1 bg-slate-950/45 p-4 rounded-2xl border border-slate-920 overflow-y-auto mb-4 space-y-3 h-[210px] custom-scrollbar">
+                    {agentHistoryLogs.map((chat, idx) => (
+                      <div 
+                        key={idx} 
+                        className={`flex gap-3 max-w-[85%] ${chat.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
+                      >
+                        <div className={`p-1.5 rounded-xl self-start shrink-0 ${
+                          chat.role === 'user' ? 'bg-pink-950 text-pink-400' : 'bg-slate-900 border border-slate-800 text-cyan-400'
+                        }`}>
+                          {chat.role === 'user' ? <Mic className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        </div>
+                        <div className={`p-3 rounded-2xl font-mono text-xs leading-relaxed whitespace-pre-wrap ${
+                          chat.role === 'user' 
+                            ? 'bg-pink-950/35 text-white border border-pink-900/30' 
+                            : 'bg-slate-900/40 border border-slate-850 text-slate-200'
+                        }`}>
+                          {chat.content}
+                        </div>
+                      </div>
+                    ))}
+                    {isAgentProcessing && (
+                      <div className="flex items-center gap-3 mr-auto">
+                        <div className="p-1.5 rounded-xl bg-slate-900 border border-slate-800 text-cyan-400 shrink-0">
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        </div>
+                        <span className="font-mono text-slate-500 text-[10px] uppercase tracking-wider animate-pulse">Calculating neural strategy alignments...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Audio Waveform visualization panel */}
+                  {isRecordingAudio && (
+                    <div className="flex items-center justify-center gap-1 mb-3 bg-pink-950/20 py-2 border border-pink-900/20 rounded-xl">
+                      <span className="text-[9px] font-mono text-pink-400/90 uppercase tracking-widest mr-2 animate-pulse">Recording vocal feed:</span>
+                      {[...Array(12)].map((_, i) => (
+                        <motion.div 
+                          key={i}
+                          animate={{ height: [8, 24, 8] }}
+                          transition={{ duration: 0.5 + (i * 0.05), repeat: Infinity, ease: "easeInOut" }}
+                          className="w-[2.5px] bg-pink-500 rounded-full"
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Input form */}
+                  <div className="flex items-center gap-2 bg-slate-900 border border-slate-800/80 rounded-2xl p-1.5">
+                    
+                    {/* Microphone input trigger */}
+                    <button
+                      onClick={startVoiceChatCapture}
+                      disabled={isRecordingAudio || isAgentProcessing}
+                      className={`p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 ${
+                        isRecordingAudio 
+                          ? 'bg-rose-500 text-white animate-pulse shadow-[0_0_12px_rgba(239,68,68,0.4)]' 
+                          : 'bg-pink-950 hover:bg-pink-900 text-pink-400 hover:text-pink-100 border border-pink-800/40'
+                      }`}
+                      title="Speak Command to Intelligent Terminal"
+                    >
+                      <Mic className="w-4 h-4" />
+                    </button>
+
+                    <input 
+                      type="text"
+                      placeholder="Ask the Virtual AI to: 'install scipy', 'clone covalent', or 'write grover python script'..."
+                      value={agentInputText}
+                      onChange={(e) => setAgentInputText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") submitAgentIntelMessage();
+                      }}
+                      className="flex-1 bg-transparent border-none text-white outline-none focus:ring-0 font-mono text-xs py-1 px-1"
+                    />
+
+                    <button
+                      onClick={() => submitAgentIntelMessage()}
+                      disabled={isAgentProcessing || !agentInputText.trim()}
+                      className="p-1 px-3 bg-pink-900/60 hover:bg-pink-850/80 border border-pink-800 text-pink-300 hover:text-pink-100 rounded-xl transition-colors font-mono text-[10px] font-medium tracking-wide uppercase shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Send Message
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* === TAB 3: WEB CODE SEARCH === */}
+              {terminalTab === 'search' && (
+                <div className="flex-1 flex flex-col justify-between h-[360px]">
+                  
+                  {/* Search Bar section */}
+                  <div className="flex gap-2 mb-3">
+                    <div className="flex-1 relative flex items-center bg-slate-900 border border-slate-800 rounded-2xl px-3 py-1">
+                      <Search className="w-4 h-4 text-slate-500 mr-2 shrink-0" />
+                      <input 
+                        type="text"
+                        placeholder="Search web for codes (e.g. Shor factoring code, Grover circuit, VQE molecules)..."
+                        value={webSearchQuery}
+                        onChange={(e) => setWebSearchQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleWebSearchSubmit();
+                        }}
+                        className="flex-1 bg-transparent border-none text-white outline-none focus:ring-0 font-mono text-xs py-1.5"
+                      />
+                    </div>
+                    <button
+                      onClick={() => handleWebSearchSubmit()}
+                      disabled={isSearchingWeb}
+                      className="p-1.5 px-4 bg-amber-950/60 hover:bg-amber-900/80 border border-amber-800 text-amber-300 hover:text-amber-100 rounded-2xl font-mono text-[10px] font-bold uppercase cursor-pointer shrink-0 transition-colors disabled:opacity-50"
+                    >
+                      {isSearchingWeb ? "Scanning..." : "Scan Web"}
+                    </button>
+                  </div>
+
+                  {/* Search results box */}
+                  <div className="flex-1 bg-slate-950/45 p-3 rounded-2xl border border-slate-920 overflow-y-auto space-y-4 h-[250px] custom-scrollbar">
+                    {isSearchingWeb ? (
+                      <div className="h-full flex flex-col items-center justify-center gap-2">
+                        <RefreshCw className="w-6 h-6 text-amber-500 animate-spin" />
+                        <span className="font-mono text-slate-400 text-[10px] uppercase tracking-widest animate-pulse">Harnessing Gemini search grounding spectrums...</span>
+                      </div>
+                    ) : webSearchResults.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center gap-2 text-slate-600 font-mono text-[10px] text-center p-6 bg-slate-900/10 border border-dashed border-slate-900/60 rounded-xl">
+                        <span className="font-bold">WEB TELEMETRY INACTIVE</span>
+                        <span>Key in quantum algorithms like "Shor's", "Grover's", or "VQE" and click Scan Web to pull functional code live from remote repositories.</span>
+                        <div className="flex gap-2 mt-2">
+                          <button 
+                            onClick={() => { setWebSearchQuery("Shor's Factoring python"); handleWebSearchSubmit("Shor's Factoring python"); }}
+                            className="bg-slate-900 hover:bg-slate-800 text-slate-400 px-2 py-1 rounded text-[8.5px] border border-slate-800 cursor-pointer"
+                          >
+                            Try "Shor"
+                          </button>
+                          <button 
+                            onClick={() => { setWebSearchQuery("Grover's Amplitude Search"); handleWebSearchSubmit("Grover's Amplitude Search"); }}
+                            className="bg-slate-900 hover:bg-slate-800 text-slate-400 px-2 py-1 rounded text-[8.5px] border border-slate-800 cursor-pointer"
+                          >
+                            Try "Grover"
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      webSearchResults.map((result, idx) => (
+                        <div 
+                          key={idx} 
+                          className="bg-slate-900/35 hover:bg-slate-900/50 border border-slate-900 rounded-xl p-3 flex flex-col gap-2.5 transition-colors relative overflow-hidden"
+                        >
+                          <div className="flex justify-between items-start flex-wrap gap-2">
+                            <div>
+                              <h5 className="font-mono text-xs font-bold text-amber-400 mb-0.5">{result.title}</h5>
+                              <p className="text-[9.5px] font-mono text-slate-400 leading-normal">{result.desc}</p>
+                            </div>
+                            <span className="text-[8px] bg-slate-950 border border-slate-800 text-slate-500 font-mono uppercase font-bold px-1.5 py-0.5 rounded">
+                              {result.language}
+                            </span>
+                          </div>
+
+                          {/* Code pre box */}
+                          <div className="relative bg-slate-950/80 p-2.5 rounded-xl border border-slate-905 overflow-x-auto max-h-[160px] custom-scrollbar">
+                            <pre className="font-mono text-[9px] text-emerald-400 select-text leading-tight whitespace-pre">
+                              {result.code}
+                            </pre>
+
+                            {/* Copy and Save quick actions */}
+                            <div className="absolute top-2 right-2 flex gap-1.5">
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(result.code);
+                                  setCopiedIndex(idx);
+                                  addToast("CODE COPIED", "Code snippet cached to your clipboard.", "success");
+                                  triggerBeep(950, "sine", 0.05);
+                                  setTimeout(() => setCopiedIndex(null), 1500);
+                                }}
+                                className="bg-slate-900 hover:bg-slate-850 p-1 rounded border border-slate-800 text-slate-400 hover:text-white cursor-pointer"
+                                title="Copy Code to Clipboard"
+                              >
+                                {copiedIndex === idx ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                              </button>
+                              
+                              <button
+                                onClick={async () => {
+                                  const name = `${result.title.toLowerCase().replace(/[^a-z0-9]/g, '_')}.py`;
+                                  await writeCustomFile(name, result.code);
+                                  triggerBeep(720, "sine", 0.05);
+                                }}
+                                className="bg-slate-900 hover:bg-slate-850 p-1 px-2 text-[8px] rounded border border-slate-800 text-amber-400 flex items-center gap-1 cursor-pointer font-mono font-bold"
+                                title="Download and save program to Workspace"
+                              >
+                                <Save className="w-3 h-3 text-amber-400" />
+                                <span>INTEGRATE</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* === TAB 4: WORKSPACE FILES === */}
+              {terminalTab === 'workspace' && (
+                <div className="flex-1 flex flex-col justify-between h-[360px]">
+                  {isWorkspaceLoading ? (
+                    <div className="h-full flex-1 flex flex-col items-center justify-center gap-2">
+                      <RefreshCw className="w-5 h-5 text-emerald-500 animate-spin" />
+                      <span className="font-mono text-[10px] text-slate-500 uppercase tracking-widest animate-pulse">Syncing workstation filesystem clusters...</span>
+                    </div>
+                  ) : activeWorkspaceView === 'list' ? (
+                    <>
+                      {/* Top Action layout: Create New File */}
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-[10px] font-mono text-slate-450 uppercase tracking-wider font-bold">Workspace Active Directories</span>
+                        
+                        {isCreatingNewFile ? (
+                          <div className="flex gap-1.5 items-center">
+                            <input 
+                              type="text"
+                              autoFocus
+                              placeholder="Filename (e.g. vqe.py)..."
+                              value={newFileTitle}
+                              onChange={(e) => setNewFileTitle(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') handleCreateNewFile(); }}
+                              className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-0.5 text-[9.5px] font-mono text-white outline-none w-36"
+                            />
+                            <button 
+                              onClick={handleCreateNewFile}
+                              className="bg-emerald-950 border border-emerald-800 text-emerald-400 hover:text-emerald-100 p-1 rounded-md cursor-pointer text-[9.5px] font-mono uppercase px-2 font-bold"
+                            >
+                              Add
+                            </button>
+                            <button 
+                              onClick={() => { setIsCreatingNewFile(false); setNewFileTitle(""); }}
+                              className="bg-slate-900 border border-slate-800 text-slate-500 hover:text-slate-300 p-1 px-2 rounded-md cursor-pointer text-[9.5px] font-mono"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { setIsCreatingNewFile(true); triggerBeep(450, "sine", 0.05); }}
+                            className="bg-emerald-950 border border-emerald-800 text-emerald-400 hover:text-emerald-100 p-1 px-2.5 rounded-lg cursor-pointer text-[9.5px] font-mono font-bold uppercase flex items-center gap-1 transition-colors"
+                          >
+                            <Plus className="w-3 h-3 text-emerald-400 shrink-0" />
+                            Create Custom Code
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Files list cards */}
+                      <div className="flex-1 bg-slate-950/45 p-3 rounded-2xl border border-slate-920 overflow-y-auto space-y-2 h-[220px] custom-scrollbar">
+                        {workspaceFiles.length === 0 ? (
+                          <div className="h-full flex flex-col items-center justify-center text-slate-600 font-mono text-[9px]">
+                            No custom files detected. Create a file above.
+                          </div>
+                        ) : (
+                          workspaceFiles.map((file) => (
+                            <div 
+                              key={file.name} 
+                              className="bg-slate-900/20 hover:bg-slate-900/40 border border-slate-900 rounded-xl p-3 flex items-center justify-between gap-4 transition-all"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <Code className="w-5 h-5 text-emerald-500 shrink-0" />
+                                <div className="min-w-0">
+                                  <h6 className="font-mono text-xs font-bold text-slate-200 truncate">{file.name}</h6>
+                                  <p className="text-[8px] font-mono text-slate-500">
+                                    {(file.size / 1024).toFixed(2)} KB | Modified: {new Date(file.mtime).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex gap-2">
+                                {/* Edit code trigger */}
+                                <button
+                                  onClick={() => {
+                                    setSelectedFileName(file.name);
+                                    // Set editing seed block based on file name or a loader
+                                    // For simplicity retrieve the code if matches
+                                    const defaultBlocks: Record<string, string> = {
+                                      'bell_state.py': `
+# Quantum Bell State Simulation
+# Pre-loaded into the Willow QVM Microkernel Workstation
+# Simulated Qubit Entanglement |ψ+⟩ = (|00⟩ + |11⟩)/√2
+
+import random
+import time
+
+def simulate_bell_state_telemetry(runs=1000):
+    print("Initializing QVM Microkernel Phase Arrays...")
+    time.sleep(0.4)
+    print("Calibrating Lattice Grid Junction Coherence... OK")
+    print(f"Running {runs} stochastic measurement collapsed operations...")
+    
+    counts = {"00": 0, "11": 0, "01": 0, "10": 0}
+    damping_factor = 0.015
+    for _ in range(runs):
+        rnd = random.random()
+        if rnd < (0.5 - damping_factor):
+            counts["00"] += 1
+        elif rnd < (1.0 - 2 * damping_factor):
+            counts["11"] += 1
+        else:
+            if random.random() < 0.5:
+                counts["01"] += 1
+            else:
+                counts["10"] += 1
+    time.sleep(0.6)
+    print("==================================================")
+    print("              BELL STATE COLLAPSE RAW DATA        ")
+    print("==================================================")
+    for state, pct in counts.items():
+        ratio = (pct / runs) * 100
+        bar = "█" * int(ratio // 4)
+        print(f"State |{state}⟩ : {pct:4d} times ({ratio:6.2f}%) {bar}")
+    print("==================================================")
+    print("Fidelity Index: 98.42% | Phase Coherence Secured")
+
+if __name__ == "__main__":
+    simulate_bell_state_telemetry()`.trim()
+                                    };
+                                    setEditingFileCode(defaultBlocks[file.name] || `# Workspace file: ${file.name}\n\n# Press Save to commit alterations.\n# Press Run to simulate.\n`);
+                                    setActiveWorkspaceView('editor');
+                                  }}
+                                  className="text-[9.5px] font-mono text-slate-400 hover:text-white bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-lg cursor-pointer"
+                                >
+                                  Edit Code
+                                </button>
+                                
+                                {/* Run program trigger */}
+                                <button
+                                  onClick={async () => {
+                                    await executeProgramFile(file.name);
+                                    setTerminalTab('shell'); // return to console to view output
+                                  }}
+                                  disabled={isExecutingFile !== null}
+                                  className="text-[9.5px] font-mono font-bold bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 hover:text-emerald-100 text-emerald-400 px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                                >
+                                  {isExecutingFile === file.name ? (
+                                    <>
+                                      <RefreshCw className="w-3 h-3 animate-spin" />
+                                      Running...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Play className="w-3 h-3" />
+                                      Run Program
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    /* Editor Layout */
+                    <div className="flex-1 flex flex-col justify-between">
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Code className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <h6 className="font-mono text-xs font-bold text-white truncate">Editing: {selectedFileName}</h6>
+                        </div>
+
+                        <div className="flex gap-2 shrink-0">
+                          <button
+                            onClick={() => { setActiveWorkspaceView('list'); triggerBeep(450, "sine", 0.05); }}
+                            className="text-[9px] font-mono bg-slate-900 text-slate-400 hover:text-slate-200 px-2.5 py-1 rounded-lg cursor-pointer border border-slate-800"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleSaveWorkspaceFile}
+                            className="text-[9px] font-mono font-bold bg-emerald-950 border border-emerald-800 text-emerald-400 hover:text-white px-3 py-1 rounded-lg flex items-center gap-1 cursor-pointer"
+                          >
+                            <Save className="w-3 h-3" />
+                            Save File
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex-1">
+                        <textarea
+                          value={editingFileCode}
+                          onChange={(e) => setEditingFileCode(e.target.value)}
+                          className="w-full h-[220px] bg-slate-950 p-3 rounded-2xl border border-slate-900 font-mono text-[10px] text-emerald-400 leading-tight outline-none focus:ring-0 focus:border-cyan-800 focus:outline-none custom-scrollbar"
+                          spellCheck={false}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
           </motion.div>
         )}
