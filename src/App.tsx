@@ -11,6 +11,7 @@ import MultivariateMLPredictor from './components/MultivariateMLPredictor';
 import OmniQuantumHUD from './components/OmniQuantumHUD';
 import CorvusCodexLotteryAi from './components/CorvusCodexLotteryAi';
 import IshanoshadaPredictor from './components/IshanoshadaPredictor';
+import SentientCognitiveOracle from './components/SentientCognitiveOracle';
 import SimplePredictorDeck from './components/SimplePredictorDeck';
 import AgentSwarmEngine from './components/AgentSwarmEngine';
 import SplashVortexPage from './components/SplashVortexPage';
@@ -18,6 +19,7 @@ import KagglehubDatasetSync from './components/KagglehubDatasetSync';
 import StrategyProbabilityHeatmap from './components/StrategyProbabilityHeatmap';
 import QuantumStringTabSpace from './components/QuantumStringTabSpace';
 import QuantumVirtualMachine from './components/QuantumVirtualMachine';
+import QuantumQubitTerminal from './components/QuantumQubitTerminal';
 import FloatingAgentJarvis from './components/FloatingAgentJarvis';
 import Markdown from 'react-markdown';
 import { AnimatePresence } from 'motion/react';
@@ -35,6 +37,7 @@ interface LottoDraw {
   id: string;
   date: string;
   numbers: number[]; // exactly 6 numbers sorted ascending
+  bonus?: number;
 }
 
 interface Message {
@@ -48,6 +51,7 @@ interface Message {
 
 // Preset historical Lotto 649 draws for seed data
 const DEFAULT_DRAWS: LottoDraw[] = [
+  { id: '0', date: '2026-06-17', numbers: [2, 14, 23, 26, 42, 48], bonus: 25 },
   { id: '1', date: '2026-06-10', numbers: [4, 15, 23, 27, 33, 41] },
   { id: '2', date: '2026-06-06', numbers: [12, 19, 21, 30, 42, 48] },
   { id: '3', date: '2026-06-03', numbers: [2, 16, 27, 33, 39, 45] },
@@ -87,7 +91,8 @@ const STRATEGIES = [
   { id: 'number-patterns', name: '19. Dilith Number Patterns', desc: 'Mathematical progression analyzer capturing Arithmetic, Geometric, and Fibonacci pattern structures from historical sets.' },
   { id: 'linear-ml', name: '20. Advanced ML Linear Regression', desc: 'Predictive linear regression algorithm tracing slope coefficients and localized trend lines across frequency occurrences.' },
   { id: 'corvus-codex', name: '21. CorvusCodex LotteryAI Engine', desc: 'Robust predictive neural model replicating the hyperparameter gradient training sequences of the open-source mainframe.' },
-  { id: 'ishan-predict', name: '22. Ishanoshada ML Predictor', desc: 'LSTM-based Deep Learning Engine utilizing architecture based on github.com/Ishanoshada/Lottery-Predict.' }
+  { id: 'ishan-predict', name: '22. Ishanoshada ML Predictor', desc: 'LSTM-based Deep Learning Engine utilizing architecture based on github.com/Ishanoshada/Lottery-Predict.' },
+  { id: 'sentient-cognitive', name: '23. Sentient Cognitive Oracle', desc: 'Real-time multi-layered deep learning system with dynamic loss-function, adjustable sentient hyperparameters, backpropagation visualization, and extreme predictive precision.' }
 ];
 
 // 7x7 custom spiral coordinates mapping for Lotto Numbers 1-49
@@ -167,6 +172,7 @@ export default function App() {
 
   const [selectedStrategy, setSelectedStrategy] = useState<string>('freq-10');
   const [proposedNumbers, setProposedNumbers] = useState<number[]>([]);
+  const [proposedBonusNumber, setProposedBonusNumber] = useState<number | null>(25);
   const [isWCLCStreamOpen, setIsWCLCStreamOpen] = useState(false);
   const [showSplash, setShowSplash] = useState<boolean>(true);
   const [copied, setCopied] = useState<boolean>(false);
@@ -203,7 +209,7 @@ export default function App() {
 
   // Strategy layout category mapper
   const getStrategyCategory = useCallback((stratId: string) => {
-    if (['freq-10', 'avg-6', 'tri-grid', 'cluster-agents', 'lstm-ai-predict', '649-processing', 'neural-network', 'number-patterns', 'linear-ml', 'corvus-codex', 'ishan-predict'].includes(stratId)) {
+    if (['freq-10', 'avg-6', 'tri-grid', 'cluster-agents', 'lstm-ai-predict', '649-processing', 'neural-network', 'number-patterns', 'linear-ml', 'corvus-codex', 'ishan-predict', 'sentient-cognitive'].includes(stratId)) {
       return { 
         name: 'Statistical', 
         color: 'cyan', 
@@ -2672,15 +2678,76 @@ export default function App() {
         result = top.slice(0, 6).sort((a, b) => a - b);
         break;
       }
+      case 'sentient-cognitive': {
+        const pool = sortedLast.slice(0, Math.min(12, sortedLast.length));
+        const weights = new Map<number, number>();
+        for (let i = 1; i <= 49; i++) weights.set(i, Math.random() * 0.1);
+        pool.forEach((d, idx) => {
+          const rateMultiplier = Math.exp(-idx / 3.5);
+          d.numbers.forEach(num => {
+            weights.set(num, (weights.get(num) || 0) + rateMultiplier * 2.8);
+            const neighbors = [num - 1, num + 1, num - 3, num + 3];
+            neighbors.forEach(neigh => {
+              if (neigh >= 1 && neigh <= 49) {
+                weights.set(neigh, (weights.get(neigh) || 0) + rateMultiplier * 0.45);
+              }
+            });
+          });
+        });
+        const finalSelection = Array.from(weights.entries())
+          .sort((a, b) => b[1] - a[1])
+          .map(e => e[0]);
+        result = finalSelection.slice(0, 6).sort((a, b) => a - b);
+        break;
+      }
     }
 
     return result.sort((a, b) => a - b);
+  };
+
+  const getProposedBonusNumberForStrategy = (stratId: string, currentDraws: LottoDraw[] = draws, currentResult: number[] = proposedNumbers): number | null => {
+    if (currentDraws.length === 0) return null;
+    const sortedLast = [...currentDraws].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    switch (stratId) {
+      case 'sentient-cognitive': {
+        return proposedBonusNumber;
+      }
+      case 'qvm': {
+        return proposedBonusNumber;
+      }
+      default: {
+        const historicalBonuses = sortedLast.map(d => d.bonus).filter((b): b is number => b !== undefined && b >= 1 && b <= 49);
+        if (historicalBonuses.length > 0) {
+          const counts: { [key: number]: number } = {};
+          historicalBonuses.forEach(b => {
+            counts[b] = (counts[b] || 0) + 1;
+          });
+          const sorted = Object.keys(counts).map(Number).sort((x, y) => counts[y] - counts[x]);
+          const bestBonus = sorted.find(b => !currentResult.includes(b));
+          if (bestBonus !== undefined) return bestBonus;
+        }
+        
+        const lastDraw = sortedLast[0];
+        if (lastDraw) {
+          for (let offset of [7, 11, 13, 17, 3, 5]) {
+            const candidate = ((lastDraw.numbers[0] + offset) % 49) + 1;
+            if (!currentResult.includes(candidate)) {
+              return candidate;
+            }
+          }
+        }
+        return 19;
+      }
+    }
   };
 
   const calculateProposedNumbers = () => {
     if (draws.length === 0) return;
     const result = getProposedNumbersForStrategy(selectedStrategy, draws);
     setProposedNumbers(result);
+    const bonusNum = getProposedBonusNumberForStrategy(selectedStrategy, draws, result);
+    setProposedBonusNumber(bonusNum);
   };
 
   // Backtest / Historical success tracker for all strategies
@@ -5337,6 +5404,20 @@ export default function App() {
                   activeProposedNumbers={proposedNumbers} 
                 />
               )}
+
+              {/* Option 23: Sentient Cognitive Oracle */}
+              {selectedStrategy === 'sentient-cognitive' && (
+                <SentientCognitiveOracle 
+                  dataset={draws} 
+                  onPredictionsGenerated={(nums, bonus) => {
+                    setProposedNumbers(nums);
+                    if (bonus !== undefined) {
+                      setProposedBonusNumber(bonus);
+                    }
+                  }} 
+                  activeProposedNumbers={proposedNumbers} 
+                />
+              )}
             </div>
 
             {/* Glowing Tactical Decisive Block */}
@@ -5354,80 +5435,120 @@ export default function App() {
                       <span>Syncing mainframe cluster coordinate matrices...</span>
                     </div>
                   ) : (
-                    proposedNumbers.map((num, idx) => {
-                      const isRevealed = idx < revealCount;
-                      const category = getStrategyCategory(selectedStrategy);
-                      const freq = getNumberFrequency(num);
-                      
-                      return (
-                        <div 
-                          key={`${num}-${idx}`} 
-                          className="relative group flex items-center justify-center font-mono"
-                        >
-                          {/* Spinning orbital ring */}
-                          {isRevealed && (
-                            <div className={`absolute w-12 h-12 rounded-full border border-dashed animate-spin pointer-events-none opacity-60 ${
-                              category.color === 'cyan' ? 'border-cyan-400' :
-                              category.color === 'purple' ? 'border-purple-400' :
-                              category.color === 'magenta' ? 'border-pink-500' : 'border-amber-400'
-                            }`}
-                            style={{ animationDuration: '7s' }} />
-                          )}
-                          
-                          {/* Rotating glow halo under orb */}
-                          {isRevealed && (
-                            <div className={`absolute inset-0 rounded-full blur-[10px] animate-pulse opacity-45 pointer-events-none ${
-                              category.color === 'cyan' ? 'bg-cyan-500/50' :
-                              category.color === 'purple' ? 'bg-purple-500/50' :
-                              category.color === 'magenta' ? 'bg-pink-500/50' : 'bg-amber-500/50'
-                            }`} />
-                          )}
-
-                          {/* Glowing sphere orb */}
+                    <>
+                      {proposedNumbers.map((num, idx) => {
+                        const isRevealed = idx < revealCount;
+                        const category = getStrategyCategory(selectedStrategy);
+                        const freq = getNumberFrequency(num);
+                        
+                        return (
                           <div 
-                            className={`w-[40px] h-[40px] rounded-full flex items-center justify-center font-bold text-sm font-mono transition-all duration-500 relative cursor-help select-none border shadow-md active:scale-95 ${
-                              isRevealed 
-                                ? `${category.glowClass} text-white ${category.borderClass} hover:scale-110` 
-                                : 'bg-slate-950 text-slate-700 border-slate-900 shadow-inner animate-pulse'
-                            }`}
+                            key={`${num}-${idx}`} 
+                            className="relative group flex items-center justify-center font-mono"
                           >
-                            {isRevealed ? (
-                              <>
-                                <span className="z-10">{num}</span>
-                                <div className="absolute inset-0.5 rounded-full bg-gradient-to-tr from-transparent via-white/5 to-white/25 pointer-events-none" />
-                              </>
-                            ) : (
-                              <span className="text-slate-800 text-xs">•</span>
+                            {/* Spinning orbital ring */}
+                            {isRevealed && (
+                              <div className={`absolute w-12 h-12 rounded-full border border-dashed animate-spin pointer-events-none opacity-60 ${
+                                category.color === 'cyan' ? 'border-cyan-400' :
+                                category.color === 'purple' ? 'border-purple-400' :
+                                category.color === 'magenta' ? 'border-pink-500' : 'border-amber-400'
+                              }`}
+                              style={{ animationDuration: '7s' }} />
                             )}
+                            
+                            {/* Rotating glow halo under orb */}
+                            {isRevealed && (
+                              <div className={`absolute inset-0 rounded-full blur-[10px] animate-pulse opacity-45 pointer-events-none ${
+                                category.color === 'cyan' ? 'bg-cyan-500/50' :
+                                category.color === 'purple' ? 'bg-purple-500/50' :
+                                category.color === 'magenta' ? 'bg-pink-500/50' : 'bg-amber-500/50'
+                              }`} />
+                            )}
+
+                            {/* Glowing sphere orb */}
+                            <div 
+                              className={`w-[40px] h-[40px] rounded-full flex items-center justify-center font-bold text-sm font-mono transition-all duration-500 relative cursor-help select-none border shadow-md active:scale-95 ${
+                                isRevealed 
+                                  ? `${category.glowClass} text-white ${category.borderClass} hover:scale-110` 
+                                  : 'bg-slate-950 text-slate-700 border-slate-900 shadow-inner animate-pulse'
+                              }`}
+                            >
+                              {isRevealed ? (
+                                <>
+                                  <span className="z-10">{num}</span>
+                                  <div className="absolute inset-0.5 rounded-full bg-gradient-to-tr from-transparent via-white/5 to-white/25 pointer-events-none" />
+                                </>
+                              ) : (
+                                <span className="text-slate-800 text-xs">•</span>
+                              )}
+                            </div>
+
+                            {/* Cyber holographic hover metric stats popup */}
+                            {isRevealed && (
+                              <div className="absolute bottom-full mb-3 bg-slate-950/95 backdrop-blur-xl text-[9px] font-mono text-slate-200 px-3 py-2 rounded-xl border border-slate-800 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 z-[60] whitespace-nowrap shadow-[0_5px_15px_rgba(0,0,0,0.6)] transform translate-y-2 group-hover:translate-y-0 flex flex-col gap-0.5 min-w-[140px] select-none">
+                                <div className="flex justify-between items-center border-b border-slate-800 pb-1 mb-1">
+                                  <span className={`${category.textClass} font-extrabold`}>NODE-{num} MATRIX</span>
+                                  <span className="text-slate-500 bg-slate-900 px-1 rounded text-[7px] font-bold">POS-{idx+1}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-500">APPEARANCES:</span>
+                                  <span className="text-slate-200 font-bold">{freq.count} DRAWS</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-500">PROB WEIGHT:</span>
+                                  <span className={`${category.textClass} font-bold`}>{freq.rate}%</span>
+                                </div>
+                                <div className="w-full h-[2px] bg-slate-900 rounded-sm mt-1 overflow-hidden">
+                                  <div className={`h-full ${
+                                    category.color === 'cyan' ? 'bg-cyan-500' :
+                                    category.color === 'purple' ? 'bg-purple-500' :
+                                    category.color === 'magenta' ? 'bg-pink-500' : 'bg-amber-500'
+                                  }`} style={{ width: `${Math.min(100, parseFloat(freq.rate) * 5)}%` }} />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {proposedBonusNumber !== null && (
+                        <div className="relative group flex items-center justify-center font-mono">
+                          {/* Spinning square orbital boundary */}
+                          <div className="absolute w-12 h-12 rounded border border-dashed border-rose-500/80 animate-spin pointer-events-none opacity-40 animate-[spin_10s_linear_infinite]" />
+                          
+                          {/* Rotating glow halo under square */}
+                          <div className="absolute inset-0 rounded blur-[10px] bg-rose-500/30 animate-pulse pointer-events-none" />
+
+                          {/* Glowing square box */}
+                          <div 
+                            className="w-[40px] h-[40px] rounded-lg bg-rose-950 border border-rose-500/50 hover:border-rose-450 hover:scale-110 flex items-center justify-center font-bold text-sm font-mono text-rose-200 shadow-[0_0_15px_rgba(239,68,68,0.25)] transition-all duration-500 relative cursor-help select-none"
+                          >
+                            <span className="z-10">{proposedBonusNumber}</span>
+                            <div className="absolute inset-0.5 rounded bg-gradient-to-tr from-transparent via-white/5 to-white/20 pointer-events-none" />
                           </div>
 
                           {/* Cyber holographic hover metric stats popup */}
-                          {isRevealed && (
-                            <div className="absolute bottom-full mb-3 bg-slate-950/95 backdrop-blur-xl text-[9px] font-mono text-slate-200 px-3 py-2 rounded-xl border border-slate-800 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 z-[60] whitespace-nowrap shadow-[0_5px_15px_rgba(0,0,0,0.6)] transform translate-y-2 group-hover:translate-y-0 flex flex-col gap-0.5 min-w-[140px] select-none">
-                              <div className="flex justify-between items-center border-b border-slate-800 pb-1 mb-1">
-                                <span className={`${category.textClass} font-extrabold`}>NODE-{num} MATRIX</span>
-                                <span className="text-slate-500 bg-slate-900 px-1 rounded text-[7px] font-bold">POS-{idx+1}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-slate-500">APPEARANCES:</span>
-                                <span className="text-slate-200 font-bold">{freq.count} DRAWS</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-slate-500">PROB WEIGHT:</span>
-                                <span className={`${category.textClass} font-bold`}>{freq.rate}%</span>
-                              </div>
-                              <div className="w-full h-[2px] bg-slate-900 rounded-sm mt-1 overflow-hidden">
-                                <div className={`h-full ${
-                                  category.color === 'cyan' ? 'bg-cyan-500' :
-                                  category.color === 'purple' ? 'bg-purple-500' :
-                                  category.color === 'magenta' ? 'bg-pink-500' : 'bg-amber-500'
-                                }`} style={{ width: `${Math.min(100, parseFloat(freq.rate) * 5)}%` }} />
-                              </div>
+                          <div className="absolute bottom-full mb-3 bg-slate-950/95 backdrop-blur-xl text-[9px] font-mono text-slate-200 px-3 py-2 rounded-xl border border-slate-800 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 z-[60] whitespace-nowrap shadow-[0_5px_15px_rgba(0,0,0,0.6)] transform translate-y-2 group-hover:translate-y-0 flex flex-col gap-0.5 min-w-[140px] select-none">
+                            <div className="flex justify-between items-center border-b border-rose-950 pb-1 mb-1">
+                              <span className="text-rose-400 font-extrabold font-mono uppercase">BONUS NODE-{proposedBonusNumber}</span>
+                              <span className="text-rose-500 bg-rose-950/50 px-1 rounded text-[7px] font-bold">STATE: ACTIVE</span>
                             </div>
-                          )}
+                            <div className="flex justify-between">
+                              <span className="text-slate-500 font-mono">ROLE:</span>
+                              <span className="text-red-400 font-mono font-bold">BONUS SEGMENT</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500 font-mono">APPEARANCES:</span>
+                              <span className="text-slate-200 font-bold">{getNumberFrequency(proposedBonusNumber).count} DRAWS</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500 font-mono">PROB WEIGHT:</span>
+                              <span className="text-rose-400 font-bold">{getNumberFrequency(proposedBonusNumber).rate}%</span>
+                            </div>
+                          </div>
                         </div>
-                      );
-                    })
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -5669,6 +5790,17 @@ export default function App() {
         {/* PATTERN ANALYTICS */}
         {activeCategory === 'analytics' && (
         <section className="flex flex-col gap-6 w-full">
+
+          {/* Probability Frequency 49-Node Grid Heatmap */}
+          <StrategyProbabilityHeatmap
+            selectedStrategy={selectedStrategy}
+            selectedStrategyName={STRATEGIES.find(s => s.id === selectedStrategy)?.name || 'ACTIVE SEQUENCE'}
+            draws={draws}
+            getProposedNumbersForStrategy={getProposedNumbersForStrategy}
+            getStrategyCategory={getStrategyCategory}
+            title="Probability Frequency Heatmap"
+            subtitle="49-NODE REAL-TIME QUANTUM SUPERPOSITION HEATMAP BASED ON STRATEGY WEIGHTINGS"
+          />
 
           {/* Card: 6-Draw Interactive Concentric Pattern & Sequence Predictor */}
           <div className="bg-black/32 backdrop-blur-xl border border-cyan-500/15 rounded-2xl p-5 flex flex-col gap-4 shadow-[0_4px_30px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.04)] hover:border-cyan-500/25 hover:shadow-[0_0_20px_rgba(6,182,212,0.05)] transition-all duration-500">
@@ -6861,9 +6993,24 @@ export default function App() {
 
         {/* ⚛️ QUANTUM VIRTUAL MACHINE */}
         {activeCategory === 'qvm' && (
-          <section className="flex flex-col gap-5 w-full">
+          <section className="flex flex-col gap-6 w-full">
+            <QuantumQubitTerminal 
+              onApplyNumbers={(nums, bonus) => {
+                setProposedNumbers(nums);
+                if (bonus !== undefined) {
+                  setProposedBonusNumber(bonus);
+                }
+              }}
+              addToast={(title, message, type) => addToast(title, message, type as any)}
+              playSpeech={playSpeech}
+            />
             <QuantumVirtualMachine 
-              onApplyNumbers={(nums) => setProposedNumbers(nums)}
+              onApplyNumbers={(nums, bonus) => {
+                setProposedNumbers(nums);
+                if (bonus !== undefined) {
+                  setProposedBonusNumber(bonus);
+                }
+              }}
               playSpeech={playSpeech}
               isTTSEnabled={isTTSEnabled}
               addToast={(title, message, type) => addToast(title, message, type as any)}

@@ -5,7 +5,8 @@ const repos = [
   'https://github.com/quantumlib/Qualtran.git',
   'https://github.com/tensorflow/quantum.git',
   'https://github.com/quantumlib/qsim.git',
-  'https://github.com/quantumlib/OpenFermion.git'
+  'https://github.com/quantumlib/OpenFermion.git',
+  'https://github.com/AgnostiqHQ/covalent.git'
 ];
 
 if (!fs.existsSync('./quantum_libraries')) {

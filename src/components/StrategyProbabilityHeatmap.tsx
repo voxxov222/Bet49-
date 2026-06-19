@@ -23,6 +23,8 @@ interface StrategyProbabilityHeatmapProps {
     borderClass: string;
     glowClass: string;
   };
+  title?: string;
+  subtitle?: string;
 }
 
 export default function StrategyProbabilityHeatmap({
@@ -30,7 +32,9 @@ export default function StrategyProbabilityHeatmap({
   selectedStrategyName,
   draws,
   getProposedNumbersForStrategy,
-  getStrategyCategory
+  getStrategyCategory,
+  title,
+  subtitle
 }: StrategyProbabilityHeatmapProps) {
   const [hoveredNum, setHoveredNum] = useState<number | null>(null);
   const [gridMode, setGridMode] = useState<'standard' | 'spiral'>('standard');
@@ -383,13 +387,13 @@ export default function StrategyProbabilityHeatmap({
           </div>
           <div>
             <h3 className="text-xs font-mono font-bold tracking-widest text-slate-200 uppercase flex items-center gap-2">
-              Grid Superposition Heatmap
+              {title || "Grid Superposition Heatmap"}
               <span className={`text-[8px] tracking-normal font-medium px-2 py-0.5 rounded-full bg-${category.color}-500/10 border border-${category.color}-500/20 text-${category.color}-400 capitalize`}>
                 {category.name}
               </span>
             </h3>
             <p className="text-[10px] text-slate-500 font-mono mt-0.5 uppercase">
-              TOPOLOGICAL PROBABILITY SCORE DENSITY MATRIX OVER 49 NODES
+              {subtitle || "TOPOLOGICAL PROBABILITY SCORE DENSITY MATRIX OVER 49 NODES"}
             </p>
           </div>
         </div>
