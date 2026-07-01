@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { db, collection, addDoc } from '../lib/firebase';
 import { 
   Sparkles, 
   HelpCircle, 
@@ -14,7 +15,8 @@ import {
   Award,
   BookOpen,
   ArrowRight,
-  Focus
+  Focus,
+  RefreshCw
 } from 'lucide-react';
 
 interface LottoDraw {
@@ -53,6 +55,7 @@ export default function SimplePredictorDeck({
   // Set current inspected number in simple layout (defaults to 7)
   const [inspectedNum, setInspectedNum] = useState<number>(7);
   const [copied, setCopied] = useState<boolean>(false);
+  const [simplePredictionMode, setSimplePredictionMode] = useState<'single' | 'batch'>('single');
 
   // Helper check for mathematical qualities
   const isPrime = (n: number): boolean => {
@@ -133,10 +136,6 @@ export default function SimplePredictorDeck({
       const spiralStrength = isP ? 10 : isSemi ? 6 : 2;
 
       // Compound mathematical weight
-      // Frequency: we want a good average representation (higher freq is better)
-      // Gap: if a number is overdue (large gap), its probability weight increases slightly (sleeping giant theory)
-      // Tesla wave: vortex resonance
-      // Spiral coordinate density
       const rawFrequencyWeight = (freq / totalDraws) * 35;
       const rawGapWeight = Math.min(10, gap) * 1.5;
       const rawTeslaWeight = teslaHarmonizerValue * 1.5;
@@ -178,6 +177,98 @@ export default function SimplePredictorDeck({
       };
     });
   }, [draws]);
+
+  // 3. Generate batch of 5 simplified tickets based on different optimization metrics
+  const simpleBatchTickets = useMemo(() => {
+    const sorted = [...calculatedMetrics].sort((a, b) => b.totalScore - a.totalScore);
+    const tickets: number[][] = [];
+    
+    // Ticket 1: Top 6 absolute scores (Consensus Golden Set)
+    tickets.push(sorted.slice(0, 6).map(c => c.num).sort((a, b) => a - b));
+
+    // Ticket 2: Alternative offset (Every alternate top score)
+    const alternate1: number[] = [];
+    for (let i = 0; i < 12; i += 2) {
+      if (sorted[i]) alternate1.push(sorted[i].num);
+    }
+    while (alternate1.length < 6) {
+      const fallback = Math.floor(Math.random() * 49) + 1;
+      if (!alternate1.includes(fallback)) alternate1.push(fallback);
+    }
+    tickets.push(alternate1.sort((a, b) => a - b));
+
+    // Ticket 3: Sleepers mix (mix of high gaps and high frequencies)
+    const highFreqs = [...calculatedMetrics].sort((a, b) => b.frequency - a.frequency).slice(0, 3).map(c => c.num);
+    const highGaps = [...calculatedMetrics].sort((a, b) => b.gap - a.gap).slice(0, 3).map(c => c.num);
+    const sleepersMix = Array.from(new Set([...highFreqs, ...highGaps])).slice(0, 6);
+    while (sleepersMix.length < 6) {
+      const fallback = Math.floor(Math.random() * 49) + 1;
+      if (!sleepersMix.includes(fallback)) sleepersMix.push(fallback);
+    }
+    tickets.push(sleepersMix.sort((a, b) => a - b));
+
+    // Ticket 4: Tesla root favorites (3-6-9 Harmonics)
+    const teslaFavs = [...calculatedMetrics].sort((a, b) => b.harmonicRoot - a.harmonicRoot).slice(0, 6).map(c => c.num);
+    tickets.push(teslaFavs.sort((a, b) => a - b));
+
+    // Ticket 5: Prime spiral heavy nodes (Spirals & Primes)
+    const spiralFavs = [...calculatedMetrics].sort((a, b) => b.spiralStrength - a.spiralStrength).slice(0, 6).map(c => c.num);
+    tickets.push(spiralFavs.sort((a, b) => a - b));
+
+    return tickets;
+  }, [calculatedMetrics]);
+
+  // Firestore Batch Savers
+  const handleSaveSimpleBatchToFirebase = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const batchPromises = simpleBatchTickets.map((numbers, idx) => {
+        return addDoc(collection(db, 'predictions'), {
+          timestamp: new Date().toISOString(),
+          targetDrawDate: today,
+          strategyId: `simple-dashboard-batch-${idx+1}`,
+          numbers: [...numbers],
+          bonus: 25 // Default bonus for simple predictions
+        });
+      });
+      await Promise.all(batchPromises);
+      addToast(
+        'BATCH PREDICTIONS SAVED',
+        'Successfully recorded all 5 accessibility tickets to the predictions database!',
+        'success'
+      );
+      if (isTTSEnabled) {
+        playSpeech("All five accessibility tickets successfully recorded to central database.");
+      }
+    } catch (e: any) {
+      console.error(e);
+      addToast('ERROR', `Failed to save predictions batch: ${e.message}`, 'error');
+    }
+  };
+
+  const handleSaveSimpleSinglePrediction = async (numbers: number[], index: number) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      await addDoc(collection(db, 'predictions'), {
+        timestamp: new Date().toISOString(),
+        targetDrawDate: today,
+        strategyId: `simple-dashboard-batch-${index + 1}`,
+        numbers: [...numbers],
+        bonus: 25
+      });
+      addToast(
+        'PREDICTION SAVED',
+        `Prediction [${numbers.join(', ')}] logged permanently.`,
+        'success'
+      );
+      if (isTTSEnabled) {
+        playSpeech("Prediction successfully recorded to central database.");
+      }
+    } catch (e: any) {
+      console.error(e);
+      addToast('ERROR', `Failed to save prediction: ${e.message}`, 'error');
+    }
+  };
 
   // 2. Generate the consensus "Most Likely Combination" string of 6 numbers
   const simpleTopConsensus = useMemo(() => {
@@ -290,87 +381,195 @@ export default function SimplePredictorDeck({
       </div>
 
       {/* HERO SECTION: THE HIGHEST COHERENCE GOLDEN COMBINATION */}
-      <div className="bg-black/40 backdrop-blur-xl border border-amber-500/15 rounded-2xl p-6 md:p-8 flex flex-col gap-6 shadow-xl relative overflow-hidden">
-        {/* Subtle warm golden accent lines */}
-        <div className="absolute top-0 left-0 w-24 h-24 border-t border-l border-amber-500/15 rounded-tl-2xl pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-24 h-24 border-b border-r border-amber-500/15 rounded-br-2xl pointer-events-none" />
+      <div className="bg-black/40 backdrop-blur-xl border border-indigo-500/15 rounded-2xl p-6 md:p-8 flex flex-col gap-6 shadow-xl relative overflow-hidden">
+        {/* Subtle warm layout accents */}
+        <div className="absolute top-0 left-0 w-24 h-24 border-t border-l border-indigo-500/15 rounded-tl-2xl pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-24 h-24 border-b border-r border-indigo-500/15 rounded-br-2xl pointer-events-none" />
 
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-900 pb-4">
+        {/* Card Header with Dual Tabs */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-900 pb-4 select-none">
           <div>
-            <span className="text-[9px] font-mono text-amber-400 tracking-wider font-extrabold uppercase bg-amber-950/30 px-2 py-0.5 rounded border border-amber-500/20">
+            <span className="text-[9px] font-mono text-indigo-400 tracking-wider font-extrabold uppercase bg-indigo-950/30 px-2 py-0.5 rounded border border-indigo-500/20">
               OPTIMUM GOLDEN COMBINATION
             </span>
             <h3 className="text-base font-sans font-extrabold text-slate-200 mt-1.5">Most Likely sequence For The Next Draw</h3>
             <p className="text-xs text-slate-400 mt-1">This specific combination holds the highest mathematical coherence density among all 49 numbers in our tracking database.</p>
           </div>
 
-          <div className="flex items-center gap-2 mt-2 md:mt-0">
+          {/* Tab Selector */}
+          <div className="flex bg-slate-950 border border-slate-900 rounded-xl p-0.5 font-mono text-[9px] font-black shrink-0">
             <button
-              id="btn-copy-consensus"
-              onClick={handleCopyCombo}
-              className="px-3.5 py-2 rounded-lg bg-slate-950 hover:bg-slate-900 text-slate-300 hover:text-white border border-slate-800 text-[10px] font-mono font-semibold flex items-center gap-2 cursor-pointer transition active:scale-95"
+              onClick={() => setSimplePredictionMode('single')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${simplePredictionMode === 'single' ? 'bg-indigo-950/40 text-indigo-400 border border-indigo-500/15' : 'text-slate-500 hover:text-slate-300'}`}
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-amber-400" />}
-              <span>{copied ? 'COPIED!' : 'COPY COMBO'}</span>
+              SINGLE TICKET
             </button>
-
             <button
-              id="btn-deploy-consensus"
-              onClick={handleDeployConsensus}
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-600 to-yellow-500 hover:from-amber-500 hover:to-yellow-400 text-slate-950 text-[10px] font-mono font-black tracking-widest uppercase flex items-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.25)] transition duration-300 active:scale-95"
+              onClick={() => setSimplePredictionMode('batch')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${simplePredictionMode === 'batch' ? 'bg-indigo-950/40 text-indigo-400 border border-indigo-500/15' : 'text-slate-500 hover:text-slate-300'}`}
             >
-              <Lock className="w-3.5 h-3.5 text-slate-950" />
-              <span>LOCK & PREDICT</span>
+              BATCH (5 SETS)
             </button>
           </div>
         </div>
 
-        {/* Dynamic Glowing Lotto Balls Combination */}
-        <div className="py-2.5 flex flex-wrap justify-center md:justify-around items-center gap-4 select-none">
-          {simpleTopConsensus.map((card, idx) => {
-            // Pick ball design color based on status
-            const isFrequent = card.tempStatus === 'Frequent';
-            const isSleeper = card.tempStatus === 'Overdue/Sleeper';
-            
-            let badgeColor = "from-amber-400 to-yellow-600 border-amber-300/40 text-amber-950";
-            if (isFrequent) {
-              badgeColor = "from-rose-500 to-orange-600 border-rose-400/40 text-rose-950";
-            } else if (isSleeper) {
-              badgeColor = "from-indigo-500 to-blue-600 border-indigo-400/40 text-indigo-950";
-            }
+        {simplePredictionMode === 'single' ? (
+          /* SINGLE COMBINATION DISPLAY */
+          <div className="flex flex-col gap-6">
+            {/* Dynamic Glowing Lotto Balls Combination */}
+            <div className="py-2.5 flex flex-wrap justify-center md:justify-around items-center gap-4 select-none">
+              {simpleTopConsensus.map((card, idx) => {
+                const isFrequent = card.tempStatus === 'Frequent';
+                const isSleeper = card.tempStatus === 'Overdue/Sleeper';
+                
+                let badgeColor = "from-amber-400 to-yellow-600 border-amber-300/40 text-amber-950";
+                if (isFrequent) {
+                  badgeColor = "from-rose-500 to-orange-600 border-rose-400/40 text-rose-950";
+                } else if (isSleeper) {
+                  badgeColor = "from-indigo-500 to-blue-600 border-indigo-400/40 text-indigo-950";
+                }
 
-            return (
-              <div 
-                key={card.num} 
-                onClick={() => setInspectedNum(card.num)}
-                className="flex flex-col items-center gap-2 cursor-pointer group transition duration-300 transform hover:-translate-y-1.5"
+                return (
+                  <div 
+                    key={card.num} 
+                    onClick={() => setInspectedNum(card.num)}
+                    className="flex flex-col items-center gap-2 cursor-pointer group transition duration-300 transform hover:-translate-y-1.5"
+                  >
+                    <div className="text-[9px] font-mono text-slate-650 font-extrabold uppercase">BALL 0{idx + 1}</div>
+                    
+                    {/* 3D Sphere render sphere */}
+                    <div 
+                      className={`w-14 h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-br ${badgeColor} border-[3px] shadow-[inset_-2px_-4px_16px_rgba(0,0,0,0.5),0_0_20px_rgba(245,158,11,0.2)] group-hover:shadow-[inset_-2px_-4px_16px_rgba(0,0,0,0.5),0_0_30px_rgba(245,158,11,0.4)] flex flex-col justify-center items-center font-black relative transition`}
+                    >
+                      <span className="text-xl md:text-2xl font-sans tracking-tighter leading-none">{card.num}</span>
+                      {/* Miniature shiny specular reflection */}
+                      <div className="absolute top-1.5 left-2.5 w-3 h-1.5 bg-white/30 rounded-full rotate-[-15deg] filter blur-[0.5px]" />
+                    </div>
+
+                    <span className="text-[8px] font-mono text-slate-405 group-hover:text-amber-400 transition uppercase font-semibold">
+                      {card.tempStatus === 'Frequent' && '🔥 Frequent'}
+                      {card.tempStatus === 'Overdue/Sleeper' && '💤 Sleeper'}
+                      {card.tempStatus === 'Warm' && '⚡ Warm'}
+                      {card.tempStatus === 'Balanced' && '⚖ Balanced'}
+                    </span>
+                    
+                    {/* Micro scoring metrics */}
+                    <span className="text-[7.5px] font-mono text-slate-550">
+                      CR:{card.totalScore}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Bottom Actions Panel */}
+            <div className="flex flex-col sm:flex-row justify-end items-center gap-2.5 pt-4 border-t border-slate-900 select-none">
+              <button
+                id="btn-copy-consensus"
+                onClick={handleCopyCombo}
+                className="px-3.5 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-900 text-slate-300 hover:text-white border border-slate-800 text-[10px] font-mono font-bold flex items-center gap-2 cursor-pointer transition active:scale-95 w-full sm:w-auto justify-center"
               >
-                <div className="text-[9px] font-mono text-slate-650 font-extrabold uppercase">BALL 0{idx + 1}</div>
-                
-                {/* 3D Sphere render sphere */}
-                <div 
-                  className={`w-14 h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-br ${badgeColor} border-[3px] shadow-[inset_-2px_-4px_16px_rgba(0,0,0,0.5),0_0_20px_rgba(245,158,11,0.2)] group-hover:shadow-[inset_-2px_-4px_16px_rgba(0,0,0,0.5),0_0_30px_rgba(245,158,11,0.4)] flex flex-col justify-center items-center font-black relative transition`}
-                >
-                  <span className="text-xl md:text-2xl font-sans tracking-tighter leading-none">{card.num}</span>
-                  {/* Miniature shiny specular reflection */}
-                  <div className="absolute top-1.5 left-2.5 w-3 h-1.5 bg-white/30 rounded-full rotate-[-15deg] filter blur-[0.5px]" />
-                </div>
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-amber-400" />}
+                <span>{copied ? 'COPIED!' : 'COPY COMBO'}</span>
+              </button>
 
-                <span className="text-[8px] font-mono text-slate-405 group-hover:text-amber-400 transition uppercase font-semibold">
-                  {card.tempStatus === 'Frequent' && '🔥 Frequent'}
-                  {card.tempStatus === 'Overdue/Sleeper' && '💤 Sleeper'}
-                  {card.tempStatus === 'Warm' && '⚡ Warm'}
-                  {card.tempStatus === 'Balanced' && '⚖ Balanced'}
-                </span>
-                
-                {/* Micro scoring metrics */}
-                <span className="text-[7.5px] font-mono text-slate-550">
-                  CR:{card.totalScore}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+              <button
+                onClick={() => handleSaveSimpleSinglePrediction(simpleTopConsensus.map(c => c.num), 0)}
+                className="px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-900 text-indigo-400 hover:text-indigo-300 border border-indigo-900/30 text-[10px] font-mono font-bold uppercase transition active:scale-95 cursor-pointer w-full sm:w-auto text-center"
+              >
+                Save To DB
+              </button>
+
+              <button
+                id="btn-deploy-consensus"
+                onClick={handleDeployConsensus}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-500 hover:from-amber-500 hover:to-yellow-400 text-slate-950 text-[10px] font-mono font-black tracking-widest uppercase flex items-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.25)] transition duration-300 active:scale-95 w-full sm:w-auto justify-center"
+              >
+                <Lock className="w-3.5 h-3.5 text-slate-950" />
+                <span>LOCK & PREDICT</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* BATCH DISPLAY MODULE (5 UNIQUE ACCESSIBILITY TICKETS) */
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3.5">
+              {simpleBatchTickets.map((numbers, tIdx) => (
+                <div 
+                  key={tIdx}
+                  className="flex flex-col lg:flex-row items-center justify-between p-3 bg-slate-950/50 hover:bg-slate-950/95 border border-slate-900/80 hover:border-indigo-500/25 rounded-xl transition duration-300 gap-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-[9px] font-mono text-indigo-400 font-black bg-indigo-950/30 border border-indigo-500/10 px-2 py-1 rounded-lg min-w-[70px] text-center uppercase">
+                      TICKET {tIdx + 1}
+                    </span>
+
+                    {/* Lotto balls */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {numbers.map((num) => (
+                        <span
+                          key={num}
+                          className="w-8 h-8 rounded-full bg-slate-900 border border-slate-800 text-slate-300 font-mono font-bold text-xs flex items-center justify-center shadow-inner hover:border-indigo-500/30 hover:scale-105 transition cursor-pointer select-none"
+                          onClick={() => setInspectedNum(num)}
+                        >
+                          {num}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Micro Actions */}
+                  <div className="flex items-center gap-2 select-none">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(numbers.join(' - '));
+                        addToast('COPIED', `Ticket ${tIdx + 1} copied to clipboard!`, 'success');
+                      }}
+                      className="p-2 rounded-lg bg-slate-900 border border-slate-800 hover:border-indigo-500/30 text-slate-400 hover:text-indigo-300 transition duration-200 cursor-pointer"
+                      title="Copy ticket"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        onApplyNumbers(numbers);
+                        addToast('LOCK VECTOR', `Simple Ticket ${tIdx + 1} applied to core predictions drawer!`, 'success');
+                        if (isTTSEnabled) {
+                          playSpeech(`Ticket ${tIdx + 1} coordinates applied.`);
+                        }
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg bg-indigo-950/30 hover:bg-indigo-900/40 border border-indigo-500/20 hover:border-indigo-500 text-indigo-400 hover:text-white transition duration-200 text-[9px] font-mono font-black uppercase cursor-pointer"
+                    >
+                      Deploy
+                    </button>
+
+                    <button
+                      onClick={() => handleSaveSimpleSinglePrediction(numbers, tIdx)}
+                      className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-indigo-950 to-slate-950 hover:from-indigo-900 hover:to-slate-900 border border-slate-800 hover:border-indigo-400 text-indigo-300 hover:text-white transition duration-200 text-[9px] font-mono font-black uppercase cursor-pointer"
+                    >
+                      Save to DB
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Global save controls for Simple batch */}
+            <div className="flex flex-col sm:flex-row justify-between items-center border-t border-slate-900 pt-3.5 gap-4">
+              <span className="text-[9px] font-mono text-slate-550 leading-relaxed uppercase">
+                * ACCESSIBILITY BATCH DERIVES 5 HIGHLY SPECIFIC, STYLIZED RHYTHM SEGMENTS ACROSS ACTIVE TEMPORAL METRICS.
+              </span>
+
+              <button
+                onClick={handleSaveSimpleBatchToFirebase}
+                className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs font-mono font-black border border-indigo-500/20 shadow-md hover:shadow-[0_0_15px_rgba(99,102,241,0.3)] select-none active:scale-95 transition-all w-full sm:w-auto text-center cursor-pointer uppercase"
+              >
+                SAVE BATCH OF 5 TO DB
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* CORE INFO LABELS / ACCORDION DETAIL CARDS */}

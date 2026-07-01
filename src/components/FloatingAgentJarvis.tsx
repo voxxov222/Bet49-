@@ -26,6 +26,9 @@ interface FloatingAgentJarvisProps {
   onToggleTTS: () => void;
   onApplyNumbers: (nums: number[]) => void;
   addToast: (title: string, message: string, type: 'success' | 'info' | 'error' | 'warning') => void;
+  messages?: any[];
+  isThinking?: boolean;
+  onSendMessage?: (text: string) => void;
 }
 
 export default function FloatingAgentJarvis({
@@ -33,7 +36,10 @@ export default function FloatingAgentJarvis({
   isTTSEnabled,
   onToggleTTS,
   onApplyNumbers,
-  addToast
+  addToast,
+  messages,
+  isThinking,
+  onSendMessage
 }: FloatingAgentJarvisProps) {
   const orbCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -48,6 +54,26 @@ export default function FloatingAgentJarvis({
       time: '12:00:00'
     }
   ]);
+
+  // Sync with parent's thinking state
+  useEffect(() => {
+    if (isThinking) {
+      setCoreMode('speech');
+    } else {
+      setCoreMode('calm');
+    }
+  }, [isThinking]);
+
+  const displayReplies = useMemo(() => {
+    if (messages && messages.length > 0) {
+      return messages.map(m => ({
+        sender: m.role === 'user' ? 'user' as const : 'jarvis' as const,
+        text: m.content,
+        time: m.timestamp
+      }));
+    }
+    return aiReplies;
+  }, [messages, aiReplies]);
 
   // Swirling Core dynamics
   const [coreMode, setCoreMode] = useState<'calm' | 'excited' | 'spin' | 'speech'>('calm');
@@ -297,10 +323,17 @@ export default function FloatingAgentJarvis({
     e.preventDefault();
     if (!chatInput.trim()) return;
 
-    const userMsg = chatInput.trim().toUpperCase();
-    const now = new Date().toLocaleTimeString();
-    setAiReplies(prev => [...prev, { sender: 'user', text: chatInput.trim(), time: now }]);
+    const typedMsg = chatInput.trim();
     setChatInput('');
+
+    if (onSendMessage) {
+      onSendMessage(typedMsg);
+      return;
+    }
+
+    const userMsg = typedMsg.toUpperCase();
+    const now = new Date().toLocaleTimeString();
+    setAiReplies(prev => [...prev, { sender: 'user', text: typedMsg, time: now }]);
 
     // Trigger AI model animation core excitement
     setCoreMode('speech');
@@ -428,7 +461,7 @@ export default function FloatingAgentJarvis({
 
             {/* Micro chat conversation feed */}
             <div className="flex-1 overflow-y-auto max-h-[160px] flex flex-col gap-2.5 pr-1 py-1 font-mono text-[9px] scrollbar-hide select-text">
-              {aiReplies.map((reply, idx) => (
+              {displayReplies.map((reply, idx) => (
                 <div 
                   key={idx}
                   className={`flex flex-col gap-0.5 max-w-[85%] ${reply.sender === 'user' ? 'self-end items-end' : 'self-start items-start'}`}

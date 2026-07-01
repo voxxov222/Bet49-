@@ -20,6 +20,7 @@ interface InteractiveOrbitalMenuProps {
   onSelectStrategy: (id: string) => void;
   strategyHitRates: Record<string, StrategyHitRate>;
   strategyWinningStreaks: Record<string, number>;
+  strategyStreakHistories?: Record<string, number[]>;
   getStrategyCategory: (stratId: string) => {
     name: string;
     color: string;
@@ -35,6 +36,7 @@ export default function InteractiveOrbitalMenu({
   onSelectStrategy,
   strategyHitRates,
   strategyWinningStreaks,
+  strategyStreakHistories,
   getStrategyCategory
 }: InteractiveOrbitalMenuProps) {
   const [activeCategory, setActiveCategory] = useState<string>('Statistical');
@@ -210,6 +212,37 @@ export default function InteractiveOrbitalMenu({
                 <p className="text-[10px] text-slate-400 leading-relaxed font-sans line-clamp-2 select-none">
                   {strat.desc}
                 </p>
+
+                {/* Consecutive Wins / Match History Bar Chart */}
+                <div className="flex flex-col gap-1.5 mt-1 border-t border-slate-900/40 pt-1.5 select-none">
+                  <span className="text-[7px] font-mono text-slate-500 uppercase tracking-widest block font-bold leading-none">
+                    STREAK HISTORY (LAST 5 RECORDS):
+                  </span>
+                  <div className="flex items-end gap-2 h-7 mt-0.5">
+                    {(strategyStreakHistories?.[strat.id] || [0, 0, 0, 0, 0]).map((matches, i) => {
+                      const percent = (matches / 6) * 100;
+                      const isWin = matches >= 3;
+                      const barColor = isWin 
+                        ? 'bg-gradient-to-t from-emerald-600 to-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.35)]' 
+                        : 'bg-slate-800/80 hover:bg-slate-750';
+                      return (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-0.5 group/bar relative">
+                          <div 
+                            className={`w-full rounded-sm min-h-[3px] transition-all duration-500 ${barColor}`}
+                            style={{ height: `${Math.max(3, percent * 0.22)}px` }}
+                          />
+                          <span className="text-[6.5px] font-mono text-slate-500 leading-none group-hover/bar:text-cyan-400 transition-colors">
+                            {matches}
+                          </span>
+                          
+                          <div className="absolute bottom-6 scale-0 group-hover/bar:scale-100 transition-transform origin-bottom bg-slate-950 border border-slate-850 text-[6.5px] font-mono text-cyan-450 px-1.5 py-0.5 rounded shadow-xl whitespace-nowrap z-20 pointer-events-none">
+                            {isWin ? 'WIN' : 'LOSS'}: {matches} Matches
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
 
                 {/* Micro metrics tracking dashboard info */}
                 <div className="flex justify-between items-center text-[8px] font-mono border-t border-slate-900/60 pt-2 select-none">

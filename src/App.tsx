@@ -30,7 +30,7 @@ import {
   HelpCircle, Settings, Play, Pause, Send, ArrowRight, 
   Plus, Trash2, Database, Layers, Sparkles, Network, 
   ChevronRight, Volume2, VolumeX, Square, ExternalLink, Menu, X, Copy, Check, Sliders, Activity, Grid, Hexagon,
-  Calendar, Clock, History as HistoryIcon, Eye, Sun, Moon
+  Calendar, Clock, History as HistoryIcon, Eye, Sun, Moon, Compass
 } from 'lucide-react';
 
 // Define structures
@@ -184,6 +184,9 @@ export default function App() {
   const [proposedNumbers, setProposedNumbers] = useState<number[]>([]);
   const [proposedBonusNumber, setProposedBonusNumber] = useState<number | null>(25);
   const [storedPredictions, setStoredPredictions] = useState<StoredPrediction[]>([]);
+  const [predictionMode, setPredictionMode] = useState<'single' | 'batch'>('single');
+  const [batchTickets, setBatchTickets] = useState<{ numbers: number[]; bonus: number | null }[]>([]);
+  const [isGeneratingBatch, setIsGeneratingBatch] = useState<boolean>(false);
   const [isWCLCStreamOpen, setIsWCLCStreamOpen] = useState(false);
   const [showSplash, setShowSplash] = useState<boolean>(true);
   const [copied, setCopied] = useState<boolean>(false);
@@ -382,6 +385,12 @@ export default function App() {
   const [userInput, setUserInput] = useState('');
   const [isJarvisThinking, setIsJarvisThinking] = useState(false);
   const [isTTSEnabled, setIsTTSEnabled] = useState(false);
+
+  // Jarvis Deep Research Lab states
+  const [jarvisSubTab, setJarvisSubTab] = useState<'terminal' | 'research'>('terminal');
+  const [researchSummary, setResearchSummary] = useState<string>('');
+  const [researchStrategies, setResearchStrategies] = useState<any[]>([]);
+  const [isResearching, setIsResearching] = useState<boolean>(false);
   
   // Custom manual draw entry
   const [newDate, setNewDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -549,6 +558,7 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('bet49_draws', JSON.stringify(draws));
     calculateProposedNumbers();
+    generateBatchOfTickets(selectedStrategy, draws);
   }, [draws, selectedStrategy, offsets369, minSumFilter, maxSumFilter, maxConsecutiveFilter, selectedCyclicPrime, lookbackDepth]);
 
   useEffect(() => {
@@ -2789,6 +2799,118 @@ export default function App() {
     setProposedBonusNumber(bonusNum);
   };
 
+  const generateBatchOfTickets = (stratId: string = selectedStrategy, currentDraws: LottoDraw[] = draws) => {
+    setIsGeneratingBatch(true);
+    try {
+      const tickets: { numbers: number[]; bonus: number | null }[] = [];
+      const primaryNums = getProposedNumbersForStrategy(stratId, currentDraws);
+      const primaryBonus = getProposedBonusNumberForStrategy(stratId, currentDraws, primaryNums);
+      tickets.push({ numbers: primaryNums, bonus: primaryBonus });
+
+      for (let i = 1; i < 5; i++) {
+        let alteredNums: number[];
+        if (['secure-rand', 'cluster-agents', 'ishan-predict', 'sentient-cognitive', 'swarm-5d'].includes(stratId)) {
+          let attempts = 0;
+          do {
+            alteredNums = getProposedNumbersForStrategy(stratId, currentDraws);
+            attempts++;
+          } while (
+            tickets.some(t => JSON.stringify(t.numbers) === JSON.stringify(alteredNums)) && 
+            attempts < 15
+          );
+        } else {
+          // Deterministic: lookback offset shift
+          const shiftedDraws = currentDraws.slice(i * 2);
+          if (shiftedDraws.length >= 6) {
+            alteredNums = getProposedNumbersForStrategy(stratId, shiftedDraws);
+          } else {
+            alteredNums = [...primaryNums];
+            for (let k = 0; k < 2; k++) {
+              const idxToReplace = (i + k) % 6;
+              let replacement = (alteredNums[idxToReplace] + i * 5) % 49 + 1;
+              while (alteredNums.includes(replacement)) {
+                replacement = (replacement % 49) + 1;
+              }
+              alteredNums[idxToReplace] = replacement;
+            }
+            alteredNums.sort((a, b) => a - b);
+          }
+        }
+
+        const set = new Set(alteredNums);
+        while (set.size < 6) {
+          set.add(Math.floor(Math.random() * 49) + 1);
+        }
+        const finalNums = Array.from(set).sort((a, b) => a - b);
+        const finalBonus = getProposedBonusNumberForStrategy(stratId, currentDraws, finalNums);
+
+        if (!tickets.some(t => JSON.stringify(t.numbers) === JSON.stringify(finalNums))) {
+          tickets.push({ numbers: finalNums, bonus: finalBonus });
+        } else {
+          const fallbackSet = new Set<number>();
+          while (fallbackSet.size < 6) {
+            fallbackSet.add(Math.floor(Math.random() * 49) + 1);
+          }
+          const fallbackArr = Array.from(fallbackSet).sort((a, b) => a - b);
+          tickets.push({
+            numbers: fallbackArr,
+            bonus: getProposedBonusNumberForStrategy(stratId, currentDraws, fallbackArr)
+          });
+        }
+      }
+
+      setBatchTickets(tickets);
+    } catch (err: any) {
+      console.error(err);
+      addToast('ERROR', `Failed to generate batch: ${err.message}`, 'error');
+    } finally {
+      setIsGeneratingBatch(false);
+    }
+  };
+
+  const handleSaveBatchPredictions = async () => {
+    if (batchTickets.length === 0) {
+      addToast('ERROR', 'No batch tickets generated to save.', 'error');
+      return;
+    }
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const batchPromises = batchTickets.map((t, idx) => {
+        return addDoc(collection(db, 'predictions'), {
+          timestamp: new Date().toISOString(),
+          targetDrawDate: today,
+          strategyId: `${selectedStrategy}-batch-${idx+1}`,
+          numbers: [...t.numbers],
+          bonus: t.bonus
+        });
+      });
+      await Promise.all(batchPromises);
+      addToast('BATCH PREDICTIONS SAVED', 'Successfully logged all 5 ticket sets to the predictions database!', 'success');
+      playSpeech("Batch of five ticket sets successfully recorded to central database.");
+    } catch (e: any) {
+      console.error(e);
+      addToast('ERROR', `Failed to save batch predictions: ${e.message}`, 'error');
+    }
+  };
+
+  const handleSaveSinglePredictionFromBatch = async (numbers: number[], bonus: number | null, index: number) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      await addDoc(collection(db, 'predictions'), {
+        timestamp: new Date().toISOString(),
+        targetDrawDate: today,
+        strategyId: `${selectedStrategy}-batch-${index + 1}`,
+        numbers: [...numbers],
+        bonus: bonus
+      });
+      addToast('PREDICTION DATABASING', `Prediction [${numbers.join(', ')}] logged permanently to Firebase.`, 'success');
+      playSpeech("Prediction successfully recorded to central mainframe database.");
+    } catch (e: any) {
+      console.error(e);
+      addToast('ERROR', `Failed to save prediction: ${e.message}`, 'error');
+    }
+  };
+
   // Backtest / Historical success tracker for all strategies
   const strategyHitRates = useMemo(() => {
     const rates: Record<string, { hitRate: number; avgMatches: number; count: number }> = {};
@@ -2860,6 +2982,36 @@ export default function App() {
       streaks[strat.id] = streak;
     });
     return streaks;
+  }, [draws, offsets369, lookbackDepth, selectedCyclicPrime]);
+
+  const strategyStreakHistories = useMemo(() => {
+    const histories: Record<string, number[]> = {};
+    const sortedLast = [...draws].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    STRATEGIES.forEach(strat => {
+      const matchCounts: number[] = [];
+      const testCount = Math.min(5, sortedLast.length - 1);
+
+      for (let i = testCount - 1; i >= 0; i--) {
+        const olderContext = sortedLast.slice(i + 1);
+        if (olderContext.length === 0) {
+          matchCounts.push(0);
+          continue;
+        }
+
+        const proposed = getProposedNumbersForStrategy(strat.id, olderContext);
+        const actual = sortedLast[i].numbers;
+        const matches = proposed.filter(num => actual.includes(num)).length;
+        matchCounts.push(matches);
+      }
+      
+      // If we have fewer than 5 draws, pad left with 0
+      while (matchCounts.length < 5) {
+        matchCounts.unshift(0);
+      }
+      histories[strat.id] = matchCounts;
+    });
+    return histories;
   }, [draws, offsets369, lookbackDepth, selectedCyclicPrime]);
 
   // Pure mathematical 7x7 Spiral Heatmap compiler for the last 50 drawings
@@ -3486,6 +3638,40 @@ export default function App() {
       }
     };
   }, [proposedNumbers, minSumFilter, maxSumFilter, maxConsecutiveFilter, avoidExtremeRatios]);
+
+  // Trigger independent deep trend research from Jarvis Core
+  const runJarvisResearch = async () => {
+    setIsResearching(true);
+    addToast('RESEARCH CORE ENGAGED', 'J.A.R.V.I.S. is parsing historical databases and mapping trends...', 'info');
+    try {
+      const response = await fetch('/api/gemini/research', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          listPastDraws: draws.slice(0, lookbackDepth).map(d => `Draw Date ${d.date}: ${d.numbers.join(',')}`),
+          lookbackDepth: lookbackDepth
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setResearchSummary(data.summary);
+        setResearchStrategies(data.strategies);
+        addToast('RESEARCH DEPLOYED', 'Independent trend matrices generated successfully.', 'success');
+        if (isTTSEnabled) {
+          playSpeech("Sir, I have completed the independent trend research. Three refined number selection models have been formulated.");
+        }
+      } else {
+        throw new Error(data.error || 'Unknown error');
+      }
+    } catch (err: any) {
+      console.error(err);
+      addToast('RESEARCH OFFLINE', 'Error syncing research pipelines: ' + err.message, 'error');
+    } finally {
+      setIsResearching(false);
+    }
+  };
 
   // Submit message to Jarvis API endpoint
   const sendJarvisMessage = async (msgText: string = userInput) => {
@@ -4611,6 +4797,7 @@ We have a confident cross-reference match with our database!
             onSelectStrategy={setSelectedStrategy}
             strategyHitRates={strategyHitRates}
             strategyWinningStreaks={strategyWinningStreaks}
+            strategyStreakHistories={strategyStreakHistories}
             getStrategyCategory={getStrategyCategory}
           />
 
@@ -5577,185 +5764,319 @@ We have a confident cross-reference match with our database!
             </div>
 
             {/* Glowing Tactical Decisive Block */}
-            <div className="border-t border-slate-800/80 pt-5 mt-4 bg-slate-950/75 backdrop-blur-xl p-5 rounded-2xl border border-cyan-500/15 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-5 shadow-[0_4px_30px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.05),0_0_20px_rgba(6,182,212,0.03)] hover:border-cyan-500/25 transition-all duration-300">
-              <div className="flex flex-col items-center md:items-start min-w-0 flex-1">
+            <div className="border-t border-slate-800/80 pt-5 mt-4 bg-slate-950/75 backdrop-blur-xl p-5 rounded-2xl border border-cyan-500/15 flex flex-col gap-5 shadow-[0_4px_30px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.05),0_0_20px_rgba(6,182,212,0.03)] hover:border-cyan-500/25 transition-all duration-300">
+              
+              {/* Header and Mode Selector */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-900 pb-3 select-none">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-mono text-cyan-400 tracking-widest font-extrabold uppercase select-none">COORDINATE PREDICTION TARGETS</span>
                   <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
                 </div>
                 
-                <div className="flex items-center gap-3.5 mt-2.5 flex-wrap">
-                  {proposedNumbers.length === 0 ? (
-                    <div className="text-xs font-mono text-slate-500 flex items-center gap-2 py-2">
-                      <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
-                      <span>Syncing mainframe cluster coordinate matrices...</span>
-                    </div>
-                  ) : (
-                    <>
-                      {proposedNumbers.map((baseNum, idx) => {
-                        const num = isCalculating ? scrambleVals[idx] : baseNum;
-                        const isRevealed = isCalculating || idx < revealCount;
-                        const category = getStrategyCategory(selectedStrategy);
-                        const freq = getNumberFrequency(num);
-                        const calculateStyle = isCalculating ? { transform: `rotate(${scrambleVals[idx] * 12}deg) scale(1.1)` } : {};
-                        
-                        return (
-                          <div 
-                            key={`${num}-${idx}`} 
-                            className="relative group flex items-center justify-center font-mono"
-                          >
-                            {/* Spinning orbital ring */}
-                            {isRevealed && (
-                              <div className={`absolute w-12 h-12 rounded-full border border-dashed animate-spin pointer-events-none opacity-60 ${
-                                category.color === 'cyan' ? 'border-cyan-400' :
-                                category.color === 'purple' ? 'border-purple-400' :
-                                category.color === 'magenta' ? 'border-pink-500' : 'border-amber-400'
-                              }`}
-                              style={{ animationDuration: isCalculating ? '0.5s' : '7s' }} />
-                            )}
-                            
-                            {/* Rotating glow halo under orb */}
-                            {isRevealed && (
-                              <div className={`absolute inset-0 rounded-full blur-[10px] animate-pulse opacity-45 pointer-events-none ${
-                                category.color === 'cyan' ? 'bg-cyan-500/50' :
-                                category.color === 'purple' ? 'bg-purple-500/50' :
-                                category.color === 'magenta' ? 'bg-pink-500/50' : 'bg-amber-500/50'
-                              }`} />
-                            )}
-
-                            {/* Glowing sphere orb */}
-                            <div 
-                              style={calculateStyle}
-                              className={`w-[40px] h-[40px] rounded-full flex items-center justify-center font-bold text-sm font-mono transition-all duration-${isCalculating ? '75' : '500'} relative cursor-help select-none border shadow-md active:scale-95 ${
-                                isRevealed 
-                                  ? `${category.glowClass} text-white ${category.borderClass} hover:scale-110` 
-                                  : 'bg-slate-950 text-slate-700 border-slate-900 shadow-inner animate-pulse'
-                              } ${isCalculating ? 'opacity-80 scale-110 blur-[1px]' : ''}`}
-                            >
-                              {isRevealed ? (
-                                <>
-                                  <span className="z-10">{num}</span>
-                                  <div className="absolute inset-0.5 rounded-full bg-gradient-to-tr from-transparent via-white/5 to-white/25 pointer-events-none" />
-                                </>
-                              ) : (
-                                <span className="text-slate-800 text-xs">•</span>
-                              )}
-                            </div>
-
-                            {/* Cyber holographic hover metric stats popup */}
-                            {isRevealed && (
-                              <div className="absolute bottom-full mb-3 bg-slate-950/95 backdrop-blur-xl text-[9px] font-mono text-slate-200 px-3 py-2 rounded-xl border border-slate-800 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 z-[60] whitespace-nowrap shadow-[0_5px_15px_rgba(0,0,0,0.6)] transform translate-y-2 group-hover:translate-y-0 flex flex-col gap-0.5 min-w-[140px] select-none">
-                                <div className="flex justify-between items-center border-b border-slate-800 pb-1 mb-1">
-                                  <span className={`${category.textClass} font-extrabold`}>NODE-{num} MATRIX</span>
-                                  <span className="text-slate-500 bg-slate-900 px-1 rounded text-[7px] font-bold">POS-{idx+1}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-500">APPEARANCES:</span>
-                                  <span className="text-slate-200 font-bold">{freq.count} DRAWS</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-500">PROB WEIGHT:</span>
-                                  <span className={`${category.textClass} font-bold`}>{freq.rate}%</span>
-                                </div>
-                                <div className="w-full h-[2px] bg-slate-900 rounded-sm mt-1 overflow-hidden">
-                                  <div className={`h-full ${
-                                    category.color === 'cyan' ? 'bg-cyan-500' :
-                                    category.color === 'purple' ? 'bg-purple-500' :
-                                    category.color === 'magenta' ? 'bg-pink-500' : 'bg-amber-500'
-                                  }`} style={{ width: `${Math.min(100, parseFloat(freq.rate) * 5)}%` }} />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-
-                      {proposedBonusNumber !== null && (() => {
-                        const bNum = isCalculating ? scrambleVals[6] : proposedBonusNumber;
-                        const calculateStyle = isCalculating ? { transform: `rotate(${scrambleVals[6] * 12}deg) scale(1.1)` } : {};
-                        return (
-                          <div className="relative group flex items-center justify-center font-mono">
-                            {/* Spinning square orbital boundary */}
-                            <div className={`absolute w-12 h-12 rounded border border-dashed border-rose-500/80 animate-spin pointer-events-none opacity-40`} style={{ animationDuration: isCalculating ? '0.5s' : '10s' }} />
-                            
-                            {/* Rotating glow halo under square */}
-                            <div className="absolute inset-0 rounded blur-[10px] bg-rose-500/30 animate-pulse pointer-events-none" />
-
-                            {/* Glowing square box */}
-                            <div 
-                              style={calculateStyle}
-                              className={`w-[40px] h-[40px] rounded-lg bg-rose-950 border border-rose-500/50 flex items-center justify-center font-bold text-sm font-mono text-rose-200 transition-all duration-${isCalculating ? '75' : '500'} relative cursor-help select-none ${
-                                isCalculating ? 'opacity-80 scale-110 blur-[1px]' : 'hover:border-rose-450 hover:scale-110 shadow-[0_0_15px_rgba(239,68,68,0.25)]'
-                              }`}
-                            >
-                              <span className="z-10">{bNum}</span>
-                              <div className="absolute inset-0.5 rounded bg-gradient-to-tr from-transparent via-white/5 to-white/20 pointer-events-none" />
-                            </div>
-
-                            {/* Cyber holographic hover metric stats popup */}
-                            {!isCalculating && (
-                              <div className="absolute bottom-full mb-3 bg-slate-950/95 backdrop-blur-xl text-[9px] font-mono text-slate-200 px-3 py-2 rounded-xl border border-slate-800 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 z-[60] whitespace-nowrap shadow-[0_5px_15px_rgba(0,0,0,0.6)] transform translate-y-2 group-hover:translate-y-0 flex flex-col gap-0.5 min-w-[140px] select-none">
-                                <div className="flex justify-between items-center border-b border-rose-950 pb-1 mb-1">
-                                  <span className="text-rose-400 font-extrabold font-mono uppercase">BONUS NODE-{bNum}</span>
-                                  <span className="text-rose-500 bg-rose-950/50 px-1 rounded text-[7px] font-bold">STATE: ACTIVE</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-500 font-mono">ROLE:</span>
-                                  <span className="text-red-400 font-mono font-bold">BONUS SEGMENT</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-500 font-mono">APPEARANCES:</span>
-                                  <span className="text-slate-200 font-bold">{getNumberFrequency(bNum).count} DRAWS</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-500 font-mono">PROB WEIGHT:</span>
-                                  <span className="text-rose-400 font-bold">{getNumberFrequency(bNum).rate}%</span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </>
-                  )}
+                {/* Mode Selector */}
+                <div className="flex bg-slate-900/80 border border-slate-800/80 rounded-xl p-0.5 font-mono text-[9px] font-black">
+                  <button
+                    onClick={() => setPredictionMode('single')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${predictionMode === 'single' ? 'bg-cyan-950/40 text-cyan-400 border border-cyan-500/20' : 'text-slate-500 hover:text-slate-300'}`}
+                  >
+                    SINGLE COMBINATION
+                  </button>
+                  <button
+                    onClick={() => setPredictionMode('batch')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${predictionMode === 'batch' ? 'bg-cyan-950/40 text-cyan-400 border border-cyan-500/20' : 'text-slate-500 hover:text-slate-300'}`}
+                  >
+                    BATCH MODE (5 SETS)
+                  </button>
                 </div>
               </div>
 
-              {/* Action desk click panel */}
-              <div className="flex flex-col sm:flex-row gap-2.5 items-stretch md:items-center shrink-0">
-                <button
-                  id="recalculate-proposed-targets-btn"
-                  onClick={triggerManualCalculation}
-                  disabled={isCalculating}
-                  className={`border text-xs font-mono px-4 py-2.5 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 focus:outline-none relative overflow-hidden select-none active:scale-95 ${
-                    isCalculating 
-                      ? 'bg-cyan-950/20 text-cyan-500 border-cyan-500/20 animate-pulse cursor-not-allowed'
-                      : 'bg-gradient-to-r from-cyan-950/80 via-indigo-950/80 to-slate-950 border-cyan-500/35 text-cyan-300 hover:text-white hover:border-cyan-400 hover:shadow-[0_0_15px_rgba(6,182,212,0.2)]'
-                  }`}
-                >
-                  <Cpu className={`w-3.5 h-3.5 ${isCalculating ? 'animate-spin' : 'animate-pulse text-cyan-400'}`} />
-                  <span>{isCalculating ? 'SYNCHRONIZING...' : 'RECALCULATE TARGETS'}</span>
-                  {!isCalculating && (
-                    <span className="absolute inset-0 bg-cyan-400/5 rounded-xl scale-0 hover:scale-150 transition-transform duration-1000 opacity-0 hover:opacity-100 pointer-events-none" />
-                  )}
-                </button>
+              {predictionMode === 'single' ? (
+                <div className="flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-5">
+                  <div className="flex flex-col items-center md:items-start min-w-0 flex-1">
+                    <div className="flex items-center gap-3.5 mt-2.5 flex-wrap">
+                      {proposedNumbers.length === 0 ? (
+                        <div className="text-xs font-mono text-slate-500 flex items-center gap-2 py-2">
+                          <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
+                          <span>Syncing mainframe cluster coordinate matrices...</span>
+                        </div>
+                      ) : (
+                        <>
+                          {proposedNumbers.map((baseNum, idx) => {
+                            const num = isCalculating ? scrambleVals[idx] : baseNum;
+                            const isRevealed = isCalculating || idx < revealCount;
+                            const category = getStrategyCategory(selectedStrategy);
+                            const freq = getNumberFrequency(num);
+                            const calculateStyle = isCalculating ? { transform: `rotate(${scrambleVals[idx] * 12}deg) scale(1.1)` } : {};
+                            
+                            return (
+                              <div 
+                                key={`${num}-${idx}`} 
+                                className="relative group flex items-center justify-center font-mono"
+                              >
+                                {/* Spinning orbital ring */}
+                                {isRevealed && (
+                                  <div className={`absolute w-12 h-12 rounded-full border border-dashed animate-spin pointer-events-none opacity-60 ${
+                                    category.color === 'cyan' ? 'border-cyan-400' :
+                                    category.color === 'purple' ? 'border-purple-400' :
+                                    category.color === 'magenta' ? 'border-pink-500' : 'border-amber-400'
+                                  }`}
+                                  style={{ animationDuration: isCalculating ? '0.5s' : '7s' }} />
+                                )}
+                                
+                                {/* Rotating glow halo under orb */}
+                                {isRevealed && (
+                                  <div className={`absolute inset-0 rounded-full blur-[10px] animate-pulse opacity-45 pointer-events-none ${
+                                    category.color === 'cyan' ? 'bg-cyan-500/50' :
+                                    category.color === 'purple' ? 'bg-purple-500/50' :
+                                    category.color === 'magenta' ? 'bg-pink-500/50' : 'bg-amber-500/50'
+                                  }`} />
+                                )}
 
-                <button
-                  id="copy-numbers-btn"
-                  onClick={handleCopyNumbers}
-                  className="border border-slate-800 hover:border-cyan-500/40 bg-slate-900/60 backdrop-blur-sm px-4 py-2.5 rounded-xl text-xs font-mono text-slate-300 hover:text-cyan-400 transition-all flex items-center justify-center gap-1.5 focus:outline-none select-none active:scale-95"
-                >
-                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copied ? 'TRANSFERRED' : 'COPY'}</span>
-                </button>
-                <button
-                  id="save-prediction-btn"
-                  onClick={handleSavePrediction}
-                  className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white px-5 py-2.5 rounded-xl text-xs font-mono transition-all duration-300 shadow-md border border-cyan-400/20 focus:outline-none select-none active:scale-95 hover:shadow-[0_0_12px_rgba(6,182,212,0.25)]"
-                >
-                  SAVE PREDICTION TO DB
-                </button>
-              </div>
+                                {/* Glowing sphere orb */}
+                                <div 
+                                  style={calculateStyle}
+                                  className={`w-[40px] h-[40px] rounded-full flex items-center justify-center font-bold text-sm font-mono transition-all duration-${isCalculating ? '75' : '500'} relative cursor-help select-none border shadow-md active:scale-95 ${
+                                    isRevealed 
+                                      ? `${category.glowClass} text-white ${category.borderClass} hover:scale-110` 
+                                      : 'bg-slate-950 text-slate-700 border-slate-900 shadow-inner animate-pulse'
+                                  } ${isCalculating ? 'opacity-80 scale-110 blur-[1px]' : ''}`}
+                                >
+                                  {isRevealed ? (
+                                    <>
+                                      <span className="z-10">{num}</span>
+                                      <div className="absolute inset-0.5 rounded-full bg-gradient-to-tr from-transparent via-white/5 to-white/25 pointer-events-none" />
+                                    </>
+                                  ) : (
+                                    <span className="text-slate-800 text-xs">•</span>
+                                  )}
+                                </div>
+
+                                {/* Cyber holographic hover metric stats popup */}
+                                {isRevealed && (
+                                  <div className="absolute bottom-full mb-3 bg-slate-950/95 backdrop-blur-xl text-[9px] font-mono text-slate-200 px-3 py-2 rounded-xl border border-slate-800 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 z-[60] whitespace-nowrap shadow-[0_5px_15px_rgba(0,0,0,0.6)] transform translate-y-2 group-hover:translate-y-0 flex flex-col gap-0.5 min-w-[140px] select-none">
+                                    <div className="flex justify-between items-center border-b border-slate-800 pb-1 mb-1">
+                                      <span className={`${category.textClass} font-extrabold`}>NODE-{num} MATRIX</span>
+                                      <span className="text-slate-500 bg-slate-900 px-1 rounded text-[7px] font-bold">POS-{idx+1}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-500">APPEARANCES:</span>
+                                      <span className="text-slate-200 font-bold">{freq.count} DRAWS</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-500">PROB WEIGHT:</span>
+                                      <span className={`${category.textClass} font-bold`}>{freq.rate}%</span>
+                                    </div>
+                                    <div className="w-full h-[2px] bg-slate-900 rounded-sm mt-1 overflow-hidden">
+                                      <div className={`h-full ${
+                                        category.color === 'cyan' ? 'bg-cyan-500' :
+                                        category.color === 'purple' ? 'bg-purple-500' :
+                                        category.color === 'magenta' ? 'bg-pink-500' : 'bg-amber-500'
+                                      }`} style={{ width: `${Math.min(100, parseFloat(freq.rate) * 5)}%` }} />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+
+                          {proposedBonusNumber !== null && (() => {
+                            const bNum = isCalculating ? scrambleVals[6] : proposedBonusNumber;
+                            const calculateStyle = isCalculating ? { transform: `rotate(${scrambleVals[6] * 12}deg) scale(1.1)` } : {};
+                            return (
+                              <div className="relative group flex items-center justify-center font-mono">
+                                {/* Spinning square orbital boundary */}
+                                <div className={`absolute w-12 h-12 rounded border border-dashed border-rose-500/80 animate-spin pointer-events-none opacity-40`} style={{ animationDuration: isCalculating ? '0.5s' : '10s' }} />
+                                
+                                {/* Rotating glow halo under square */}
+                                <div className="absolute inset-0 rounded blur-[10px] bg-rose-500/30 animate-pulse pointer-events-none" />
+
+                                {/* Glowing square box */}
+                                <div 
+                                  style={calculateStyle}
+                                  className={`w-[40px] h-[40px] rounded-lg bg-rose-950 border border-rose-500/50 flex items-center justify-center font-bold text-sm font-mono text-rose-200 transition-all duration-${isCalculating ? '75' : '500'} relative cursor-help select-none ${
+                                    isCalculating ? 'opacity-80 scale-110 blur-[1px]' : 'hover:border-rose-450 hover:scale-110 shadow-[0_0_15px_rgba(239,68,68,0.25)]'
+                                  }`}
+                                >
+                                  <span className="z-10">{bNum}</span>
+                                  <div className="absolute inset-0.5 rounded bg-gradient-to-tr from-transparent via-white/5 to-white/20 pointer-events-none" />
+                                </div>
+
+                                {/* Cyber holographic hover metric stats popup */}
+                                {!isCalculating && (
+                                  <div className="absolute bottom-full mb-3 bg-slate-950/95 backdrop-blur-xl text-[9px] font-mono text-slate-200 px-3 py-2 rounded-xl border border-slate-800 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 z-[60] whitespace-nowrap shadow-[0_5px_15px_rgba(0,0,0,0.6)] transform translate-y-2 group-hover:translate-y-0 flex flex-col gap-0.5 min-w-[140px] select-none">
+                                    <div className="flex justify-between items-center border-b border-rose-950 pb-1 mb-1">
+                                      <span className="text-rose-400 font-extrabold font-mono uppercase">BONUS NODE-{bNum}</span>
+                                      <span className="text-rose-500 bg-rose-950/50 px-1 rounded text-[7px] font-bold">STATE: ACTIVE</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-500 font-mono">ROLE:</span>
+                                      <span className="text-red-400 font-mono font-bold">BONUS SEGMENT</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-500 font-mono">APPEARANCES:</span>
+                                      <span className="text-slate-200 font-bold">{getNumberFrequency(bNum).count} DRAWS</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-500 font-mono">PROB WEIGHT:</span>
+                                      <span className="text-rose-400 font-bold">{getNumberFrequency(bNum).rate}%</span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action desk click panel */}
+                  <div className="flex flex-col sm:flex-row gap-2.5 items-stretch md:items-center shrink-0 select-none">
+                    <button
+                      id="recalculate-proposed-targets-btn"
+                      onClick={triggerManualCalculation}
+                      disabled={isCalculating}
+                      className={`border text-xs font-mono px-4 py-2.5 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 focus:outline-none relative overflow-hidden select-none active:scale-95 cursor-pointer ${
+                        isCalculating 
+                          ? 'bg-cyan-950/20 text-cyan-500 border-cyan-500/20 animate-pulse cursor-not-allowed'
+                          : 'bg-gradient-to-r from-cyan-950/80 via-indigo-950/80 to-slate-950 border-cyan-500/35 text-cyan-300 hover:text-white hover:border-cyan-400 hover:shadow-[0_0_15px_rgba(6,182,212,0.2)]'
+                      }`}
+                    >
+                      <Cpu className={`w-3.5 h-3.5 ${isCalculating ? 'animate-spin' : 'animate-pulse text-cyan-400'}`} />
+                      <span>{isCalculating ? 'SYNCHRONIZING...' : 'RECALCULATE TARGETS'}</span>
+                      {!isCalculating && (
+                        <span className="absolute inset-0 bg-cyan-400/5 rounded-xl scale-0 hover:scale-150 transition-transform duration-1000 opacity-0 hover:opacity-100 pointer-events-none" />
+                      )}
+                    </button>
+
+                    <button
+                      id="copy-numbers-btn"
+                      onClick={handleCopyNumbers}
+                      className="border border-slate-800 hover:border-cyan-500/40 bg-slate-900/60 backdrop-blur-sm px-4 py-2.5 rounded-xl text-xs font-mono text-slate-300 hover:text-cyan-400 transition-all flex items-center justify-center gap-1.5 focus:outline-none select-none active:scale-95 cursor-pointer"
+                    >
+                      {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copied ? 'TRANSFERRED' : 'COPY'}</span>
+                    </button>
+                    <button
+                      id="save-prediction-btn"
+                      onClick={handleSavePrediction}
+                      className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white px-5 py-2.5 rounded-xl text-xs font-mono transition-all duration-300 shadow-md border border-cyan-400/20 focus:outline-none select-none active:scale-95 hover:shadow-[0_0_12px_rgba(6,182,212,0.25)] cursor-pointer"
+                    >
+                      SAVE PREDICTION TO DB
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* BATCH MODE CONTENT RENDERING */
+                <div className="flex flex-col gap-4 select-none">
+                  {batchTickets.length === 0 ? (
+                    <div className="text-xs font-mono text-slate-500 flex items-center justify-center gap-2 py-8 bg-slate-950/40 border border-slate-900 rounded-xl">
+                      <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
+                      <span>Generating tactical prediction batches...</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {batchTickets.map((ticket, tIdx) => (
+                        <div 
+                          key={tIdx} 
+                          className="flex flex-col lg:flex-row items-center justify-between p-3.5 bg-slate-950/65 hover:bg-slate-950/90 rounded-xl border border-slate-900 hover:border-cyan-500/25 transition-all duration-300 gap-4"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-[10px] font-mono text-cyan-400 font-bold bg-cyan-950/35 border border-cyan-500/15 px-2.5 py-1 rounded-lg min-w-[75px] text-center">
+                              TICKET {tIdx + 1}
+                            </span>
+                            
+                            {/* Numbers */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {ticket.numbers.map((num, idx) => (
+                                <span 
+                                  key={idx} 
+                                  className="w-8 h-8 rounded-full bg-slate-900 border border-slate-800 text-slate-200 font-mono font-bold text-xs flex items-center justify-center shadow-inner hover:border-cyan-500/40 hover:scale-105 transition-all duration-200 select-none cursor-pointer"
+                                  onClick={() => {
+                                    setProposedNumbers(ticket.numbers);
+                                    if (ticket.bonus !== null) setProposedBonusNumber(ticket.bonus);
+                                    addToast('COORDINATE SELECTION', `Target ${num} focused in primary mainframe controller.`, 'info');
+                                  }}
+                                >
+                                  {num}
+                                </span>
+                              ))}
+                              {ticket.bonus !== null && (
+                                <span 
+                                  className="w-8 h-8 rounded-lg bg-rose-950 border border-rose-500/20 text-rose-300 font-mono font-bold text-xs flex items-center justify-center shadow-inner select-none cursor-help hover:border-rose-450/60"
+                                  title="Bonus Ball segment"
+                                >
+                                  {ticket.bonus}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Individual strip actions */}
+                          <div className="flex items-center gap-2 select-none">
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(ticket.numbers.join(', ') + (ticket.bonus !== null ? ` [Bonus: ${ticket.bonus}]` : ''));
+                                addToast('COPIED', `Ticket ${tIdx + 1} transferred to system clipboard!`, 'success');
+                              }}
+                              className="p-2 rounded-lg bg-slate-900 border border-slate-800 hover:border-cyan-500/30 text-slate-400 hover:text-cyan-300 transition-all cursor-pointer"
+                              title="Copy ticket combo"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                            
+                            <button
+                              onClick={() => {
+                                setProposedNumbers(ticket.numbers);
+                                if (ticket.bonus !== null) setProposedBonusNumber(ticket.bonus);
+                                addToast('DEPLOYED', `Ticket ${tIdx + 1} matrix deployed to primary workspace targets!`, 'success');
+                                if (isTTSEnabled) {
+                                  playSpeech(`Deploying ticket ${tIdx + 1} coordinates to target arrays.`);
+                                }
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-cyan-950/40 hover:bg-cyan-900/50 border border-cyan-500/25 hover:border-cyan-400 text-cyan-400 hover:text-white transition-all text-[10px] font-mono font-bold uppercase cursor-pointer"
+                            >
+                              Deploy
+                            </button>
+
+                            <button
+                              onClick={() => handleSaveSinglePredictionFromBatch(ticket.numbers, ticket.bonus, tIdx)}
+                              className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-950 to-indigo-950 hover:from-cyan-900 hover:to-indigo-900 border border-cyan-500/15 hover:border-cyan-400 text-cyan-300 hover:text-white transition-all text-[10px] font-mono font-bold uppercase cursor-pointer"
+                            >
+                              Save to DB
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Batch Global Actions panel */}
+                  <div className="flex flex-col sm:flex-row justify-between items-center border-t border-slate-900 pt-3 mt-1 gap-4">
+                    <span className="text-[9.5px] font-mono text-slate-550 leading-relaxed uppercase">
+                      * BATCH GENERATION MAPS 5 DISTINCT TRANSITION AND TEMPORAL BOUNDARY slices OVER {selectedStrategy} MATRIX PRESETS.
+                    </span>
+                    
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                      <button
+                        onClick={() => generateBatchOfTickets(selectedStrategy, draws)}
+                        className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/40 text-cyan-400 hover:text-cyan-200 rounded-xl text-xs font-mono font-bold transition-all w-full sm:w-auto text-center cursor-pointer active:scale-95"
+                      >
+                        RE-GENERATE BATCH
+                      </button>
+                      
+                      <button
+                        onClick={handleSaveBatchPredictions}
+                        disabled={batchTickets.length === 0}
+                        className="px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-xl text-xs font-mono font-black border border-cyan-500/20 shadow-md hover:shadow-[0_0_15px_rgba(6,182,212,0.3)] select-none active:scale-95 transition-all w-full sm:w-auto text-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed uppercase"
+                      >
+                        SAVE BATCH OF 5 TO DB
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
             </div>
 
           </div>
@@ -7018,128 +7339,289 @@ We have a confident cross-reference match with our database!
           <div className="bg-black/32 backdrop-blur-xl border border-cyan-500/15 rounded-2xl p-4 flex flex-col flex-1 h-full shadow-[0_4px_30px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.04)] hover:border-cyan-500/25 hover:shadow-[0_0_20px_rgba(6,182,212,0.05)] transition-all duration-500 justify-between relative overflow-hidden">
             <span className="text-[10px] font-mono text-cyan-500/50 absolute top-4 right-4 tracking-widest uppercase">TACTICAL COMMUNICATOR</span>
             
-            <div className="border-b border-slate-800 pb-2.5 mb-3">
-              <div className="flex items-center gap-2">
-                <Terminal className="w-4 h-4 text-cyan-400" />
-                <h2 className="text-xs font-mono font-bold tracking-wider text-cyan-400 uppercase">SYNAPSE TERMINAL</h2>
+            <div className="border-b border-slate-800 pb-2.5 mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setJarvisSubTab('terminal')}
+                  className={`flex items-center gap-2 pb-1 border-b-2 font-mono text-xs font-bold transition-all ${
+                    jarvisSubTab === 'terminal' 
+                      ? 'border-cyan-400 text-cyan-400' 
+                      : 'border-transparent text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  <Terminal className="w-4 h-4" />
+                  <span>SYNAPSE TERMINAL</span>
+                </button>
+                <button
+                  onClick={() => setJarvisSubTab('research')}
+                  className={`flex items-center gap-2 pb-1 border-b-2 font-mono text-xs font-bold transition-all ${
+                    jarvisSubTab === 'research' 
+                      ? 'border-cyan-400 text-cyan-400' 
+                      : 'border-transparent text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  <Cpu className="w-4 h-4" />
+                  <span>DEEP RESEARCH LAB</span>
+                </button>
               </div>
             </div>
 
-            {/* Chat Messages Frame list */}
-            <div className="flex-1 min-h-[300px] max-h-[380px] overflow-y-auto pr-1 flex flex-col gap-3 scrollbar-thin scrollbar-thumb-slate-800">
-              {messages.map((m) => (
-                <div 
-                  key={m.id} 
-                  className={`flex flex-col max-w-[85%] ${
-                    m.role === 'user' ? 'self-end items-end' : 'self-start items-start'
-                  }`}
-                >
-                  <span className="text-[8px] font-mono text-slate-500 mb-0.5">{m.role.toUpperCase()} // {m.timestamp}</span>
-                  <div 
-                    className={`rounded-xl p-3 text-xs leading-relaxed font-mono relative overflow-hidden ${
-                      m.role === 'user' 
-                        ? 'bg-cyan-950/40 text-cyan-200 border border-cyan-500/30 rounded-tr-none' 
-                        : 'bg-slate-950 text-slate-300 border border-slate-900 rounded-tl-none shadow-[0_4px_12px_rgba(2,6,23,0.3)]'
-                    }`}
-                  >
-                    <div className="whitespace-pre-wrap">{m.content}</div>
+            {jarvisSubTab === 'terminal' ? (
+              <>
+                {/* Chat Messages Frame list */}
+                <div className="flex-1 min-h-[300px] max-h-[380px] overflow-y-auto pr-1 flex flex-col gap-3 scrollbar-thin scrollbar-thumb-slate-800">
+                  {messages.map((m) => (
+                    <div 
+                      key={m.id} 
+                      className={`flex flex-col max-w-[85%] ${
+                        m.role === 'user' ? 'self-end items-end' : 'self-start items-start'
+                      }`}
+                    >
+                      <span className="text-[8px] font-mono text-slate-500 mb-0.5">{m.role.toUpperCase()} // {m.timestamp}</span>
+                      <div 
+                        className={`rounded-xl p-3 text-xs leading-relaxed font-mono relative overflow-hidden ${
+                          m.role === 'user' 
+                            ? 'bg-cyan-950/40 text-cyan-200 border border-cyan-500/30 rounded-tr-none' 
+                            : 'bg-slate-950 text-slate-300 border border-slate-900 rounded-tl-none shadow-[0_4px_12px_rgba(2,6,23,0.3)]'
+                        }`}
+                      >
+                        <div className="whitespace-pre-wrap">{m.content}</div>
 
-                    {/* Integrated dynamic citations panel */}
-                    {m.webSources && m.webSources.length > 0 && (
-                      <div className="mt-3.5 pt-2.5 border-t border-slate-800/60 flex flex-col gap-1.5 w-full">
-                        <span className="text-[7.5px] font-mono text-cyan-500/60 uppercase tracking-widest block font-extrabold flex items-center gap-1">
-                          <Network className="w-2.5 h-2.5 text-cyan-500/60" />
-                          <span>GROUNDED RESEARCH SOURCES:</span>
-                        </span>
-                        <div className="flex flex-wrap gap-1.5 mt-0.5">
-                          {m.webSources.slice(0, 3).map((source, idx) => (
-                            <a
-                              key={idx}
-                              href={source.uri}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-[8.5px] text-cyan-400 hover:text-cyan-300 bg-cyan-950/20 hover:bg-cyan-950/50 border border-cyan-500/10 px-2 py-0.5 rounded flex items-center gap-1 font-mono transition-all duration-300"
-                            >
-                              <ExternalLink className="w-2.5 h-2.5 text-cyan-500/80" />
-                              <span className="truncate max-w-[140px]">{source.title}</span>
-                            </a>
-                          ))}
+                        {/* Integrated dynamic citations panel */}
+                        {m.webSources && m.webSources.length > 0 && (
+                          <div className="mt-3.5 pt-2.5 border-t border-slate-800/60 flex flex-col gap-1.5 w-full">
+                            <span className="text-[7.5px] font-mono text-cyan-500/60 uppercase tracking-widest block font-extrabold flex items-center gap-1">
+                              <Network className="w-2.5 h-2.5 text-cyan-500/60" />
+                              <span>GROUNDED RESEARCH SOURCES:</span>
+                            </span>
+                            <div className="flex flex-wrap gap-1.5 mt-0.5">
+                              {m.webSources.slice(0, 3).map((source, idx) => (
+                                <a
+                                  key={idx}
+                                  href={source.uri}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[8.5px] text-cyan-400 hover:text-cyan-300 bg-cyan-950/20 hover:bg-cyan-950/50 border border-cyan-500/10 px-2 py-0.5 rounded flex items-center gap-1 font-mono transition-all duration-300"
+                                >
+                                  <ExternalLink className="w-2.5 h-2.5 text-cyan-500/80" />
+                                  <span className="truncate max-w-[140px]">{source.title}</span>
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Commands execution log display */}
+                        {m.commandExecuted && (
+                          <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center gap-2 text-[8px] font-mono text-emerald-400 bg-emerald-950/10 px-2 py-1 rounded border border-emerald-500/10">
+                            <Cpu className="w-3 h-3 text-emerald-400 animate-pulse" />
+                            <span className="uppercase font-extrabold">[{m.commandExecuted.name}]:</span>
+                            <span className="text-slate-400 font-medium">{m.commandExecuted.info}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {isJarvisThinking && (
+                    <div className="self-start flex flex-col items-start max-w-[85%] animate-pulse">
+                      <span className="text-[8px] font-mono text-slate-500 mb-0.5">JARVIS // DECRYPTING DATA STREAM</span>
+                      <div className="bg-slate-950 border border-slate-900 rounded-xl rounded-tl-none p-3.5 text-xs font-mono text-cyan-400/80 flex flex-col gap-2 shadow-lg">
+                        <div className="flex items-center gap-2.5">
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-cyan-400" />
+                          <span>Syncing quantum probability metrics...</span>
+                        </div>
+                        {/* Glowing animated dots */}
+                        <div className="flex items-center gap-1.5 mt-1 pl-6">
+                          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '300ms' }} />
                         </div>
                       </div>
-                    )}
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
 
-                    {/* Commands execution log display */}
-                    {m.commandExecuted && (
-                      <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center gap-2 text-[8px] font-mono text-emerald-400 bg-emerald-950/10 px-2 py-1 rounded border border-emerald-500/10">
-                        <Cpu className="w-3 h-3 text-emerald-400 animate-pulse" />
-                        <span className="uppercase font-extrabold">[{m.commandExecuted.name}]:</span>
-                        <span className="text-slate-400 font-medium">{m.commandExecuted.info}</span>
+                {/* Quick pre-defined synapse queries */}
+                <div className="mt-4 border-t border-slate-800/60 pt-3 flex flex-wrap gap-1.5">
+                  <span className="text-[8px] font-mono text-slate-500 w-full mb-1">SYSTEM INSTANT COMMANDS:</span>
+                  {[
+                    { label: 'Verify 3-6-9 pattern limits', prompt: 'JARVIS, inspect limits of 369 sequence shifts.' },
+                    { label: '5D Swarm Diagnostics', prompt: 'J.A.R.V.I.S., compute 5D quantum gravity cluster.' },
+                    { label: 'Review Peptide folding', prompt: 'Tell me how Peptide Folding locks to Lotto sequence.' },
+                    { label: 'Calculate most frequent', prompt: 'Analyze top frequencies over previous drawings.' }
+                  ].map((query, i) => (
+                    <button
+                      key={i}
+                      id={`quick-query-btn-${i}`}
+                      onClick={() => sendJarvisMessage(query.prompt)}
+                      className="text-[9px] font-mono bg-slate-950 hover:bg-cyan-950/30 text-slate-400 hover:text-cyan-400 border border-slate-900 hover:border-cyan-500/20 px-2 py-1.5 rounded transition-all outline-none"
+                    >
+                      {query.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Interactive User message entry input bar */}
+                <div className="mt-4 flex gap-2">
+                  <input 
+                    id="chat-user-input"
+                    type="text"
+                    placeholder="Direct voice-to-text queries..."
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && sendJarvisMessage()}
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-200 outline-none placeholder-slate-600 focus:border-cyan-500/50"
+                  />
+                  <button 
+                    id="send-chat-btn"
+                    onClick={() => sendJarvisMessage()}
+                    disabled={!userInput.trim() || isJarvisThinking}
+                    className="bg-cyan-950 border border-cyan-500/30 hover:border-cyan-500 text-cyan-400 p-2.5 rounded-xl flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed outline-none focus:outline-none"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-1 max-h-[500px]">
+                <div className="bg-slate-950/80 border border-slate-900 rounded-xl p-4 flex flex-col gap-3 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-cyan-500/[0.02] pointer-events-none" />
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-mono text-cyan-400 font-extrabold uppercase tracking-widest">Autonomous Deep Trend Intelligence</span>
+                      <p className="text-[11px] text-slate-450 mt-1 leading-relaxed">
+                        Authorize J.A.R.V.I.S. to execute unguided cognitive runs across all Lotto 649 historical data points. The engine will discover hidden sequence correlations, model localized prime divisors, and suggest custom selection sets.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={runJarvisResearch}
+                    disabled={isResearching}
+                    className="mt-2 w-full py-3 px-4 bg-cyan-950/30 hover:bg-cyan-950/70 border border-cyan-500/35 hover:border-cyan-400 text-cyan-400 rounded-xl font-mono text-xs font-bold tracking-wider uppercase transition-all duration-300 flex items-center justify-center gap-2.5 shadow-[0_0_15px_rgba(6,182,212,0.1)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {isResearching ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
+                        <span>ENGAGING DEEP RESEARCH CORES...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Compass className="w-4 h-4 text-cyan-400 animate-pulse" />
+                        <span>LAUNCH INDEPENDENT TREND RESEARCH</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Animated progress states for active research run */}
+                {isResearching && (
+                  <div className="bg-slate-950/90 border border-cyan-500/20 rounded-xl p-4 flex flex-col gap-3 font-mono text-[10px] text-cyan-400 animate-pulse">
+                    <div className="flex items-center gap-2 pb-2 border-b border-slate-900">
+                      <Activity className="w-3.5 h-3.5 text-cyan-400 animate-bounce" />
+                      <span className="font-extrabold uppercase">COGNITIVE RADAR SWEEP ACTIVE</span>
+                    </div>
+                    <div className="flex flex-col gap-1.5 text-slate-400">
+                      <p className="flex justify-between"><span>[GRID_SCAN] Mapping historical entropy manifolds:</span> <span className="text-cyan-400">RUNNING</span></p>
+                      <p className="flex justify-between"><span>[COV_MATRIX] Calculating prime divisors of last {lookbackDepth} draws:</span> <span className="text-cyan-400">POLARIZING</span></p>
+                      <p className="flex justify-between"><span>[ML_SYNAPSE] Formulating custom prediction overlays:</span> <span className="text-cyan-400">COMPILING</span></p>
+                    </div>
+                    <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden mt-1">
+                      <div className="h-full bg-cyan-500 animate-[progress_3s_ease-in-out_infinite]" style={{ width: '45%' }} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Research Results Display */}
+                {!isResearching && researchSummary && (
+                  <div className="flex flex-col gap-4">
+                    {/* Diagnostic Summary Report */}
+                    <div className="bg-slate-950/60 border border-slate-900 rounded-xl p-4 flex flex-col gap-2.5">
+                      <div className="flex items-center gap-2 border-b border-slate-900 pb-2">
+                        <Activity className="w-3.5 h-3.5 text-amber-400" />
+                        <span className="text-[10px] font-mono font-bold text-amber-400 uppercase tracking-widest">J.A.R.V.I.S. INTELLIGENCE BRIEFING</span>
                       </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              {isJarvisThinking && (
-                <div className="self-start flex flex-col items-start max-w-[85%] animate-pulse">
-                  <span className="text-[8px] font-mono text-slate-500 mb-0.5">JARVIS // DECRYPTING DATA STREAM</span>
-                  <div className="bg-slate-950 border border-slate-900 rounded-xl rounded-tl-none p-3.5 text-xs font-mono text-cyan-400/80 flex flex-col gap-2 shadow-lg">
-                    <div className="flex items-center gap-2.5">
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-cyan-400" />
-                      <span>Syncing quantum probability metrics...</span>
+                      <div className="text-[11.5px] text-slate-300 font-sans leading-relaxed whitespace-pre-wrap">
+                        {researchSummary}
+                      </div>
                     </div>
-                    {/* Glowing animated dots */}
-                    <div className="flex items-center gap-1.5 mt-1 pl-6">
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+
+                    {/* Proactive Selection Models (Cards) */}
+                    <div className="flex flex-col gap-3">
+                      <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest font-extrabold">DISCOVERED REFINED NUMBER GENERATING ALGORITHMS:</span>
+                      {researchStrategies.map((strat, i) => (
+                        <div 
+                          key={i}
+                          className="bg-slate-950/80 border border-slate-800/80 hover:border-cyan-500/20 rounded-xl p-4 flex flex-col gap-3 transition-all duration-300 group"
+                        >
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-xs font-mono font-extrabold text-cyan-400 uppercase tracking-wide">
+                                {strat.name}
+                              </span>
+                              <p className="text-[10.5px] text-slate-400 leading-relaxed mt-0.5">
+                                {strat.description}
+                              </p>
+                            </div>
+                            <span className="text-[8px] font-mono bg-cyan-950/50 border border-cyan-500/25 text-cyan-300 px-1.5 py-0.5 rounded uppercase font-black">
+                              SUGGESTED
+                            </span>
+                          </div>
+
+                          {/* Discovered Numbers Set layout */}
+                          <div className="flex items-center gap-2 bg-slate-900/40 p-2.5 rounded-xl border border-slate-900">
+                            <span className="text-[8.5px] font-mono text-slate-500 uppercase">SUGGESTED SEQUENCE:</span>
+                            <div className="flex items-center gap-1 ml-auto">
+                              {strat.numbers && Array.isArray(strat.numbers) && strat.numbers.map((n: number, idx: number) => (
+                                <span 
+                                  key={idx}
+                                  className="w-6 h-6 rounded-lg bg-slate-950 text-cyan-300 font-bold font-mono text-[10.5px] border border-slate-800/80 flex items-center justify-center shadow-inner group-hover:border-cyan-500/30 transition-all"
+                                >
+                                  {n}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Deployment trigger Button */}
+                          <button
+                            onClick={() => {
+                              if (strat.numbers && Array.isArray(strat.numbers)) {
+                                setProposedNumbers(strat.numbers);
+                                addToast(
+                                  'METHOD DEPLOYED TO PREDICTION DECK',
+                                  `Successfully compiled ${strat.name} to active workspace.`,
+                                  'success'
+                                );
+                                if (isTTSEnabled) {
+                                  playSpeech(`Deploying ${strat.name} coordinates to prediction deck.`);
+                                }
+                              }
+                            }}
+                            className="w-full py-2 bg-cyan-500/10 hover:bg-cyan-500 text-cyan-400 hover:text-black border border-cyan-500/20 hover:border-cyan-400 rounded-xl font-mono text-[9px] font-extrabold tracking-widest uppercase transition-all duration-300 cursor-pointer text-center"
+                          >
+                            DEPLOY METHOD TO PREDICTION DECK
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
+                )}
 
-            {/* Quick pre-defined synapse queries */}
-            <div className="mt-4 border-t border-slate-800/60 pt-3 flex flex-wrap gap-1.5">
-              <span className="text-[8px] font-mono text-slate-500 w-full mb-1">SYSTEM INSTANT COMMANDS:</span>
-              {[
-                { label: 'Verify 3-6-9 pattern limits', prompt: 'JARVIS, inspect limits of 369 sequence shifts.' },
-                { label: '5D Swarm Diagnostics', prompt: 'J.A.R.V.I.S., compute 5D quantum gravity cluster.' },
-                { label: 'Review Peptide folding', prompt: 'Tell me how Peptide Folding locks to Lotto sequence.' },
-                { label: 'Calculate most frequent', prompt: 'Analyze top frequencies over previous drawings.' }
-              ].map((query, i) => (
-                <button
-                  key={i}
-                  id={`quick-query-btn-${i}`}
-                  onClick={() => sendJarvisMessage(query.prompt)}
-                  className="text-[9px] font-mono bg-slate-950 hover:bg-cyan-950/30 text-slate-400 hover:text-cyan-400 border border-slate-900 hover:border-cyan-500/20 px-2 py-1.5 rounded transition-all outline-none"
-                >
-                  {query.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Interactive User message entry input bar */}
-            <div className="mt-4 flex gap-2">
-              <input 
-                id="chat-user-input"
-                type="text"
-                placeholder="Direct voice-to-text queries..."
-                value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && sendJarvisMessage()}
-                className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-200 outline-none placeholder-slate-600 focus:border-cyan-500/50"
-              />
-              <button 
-                id="send-chat-btn"
-                onClick={() => sendJarvisMessage()}
-                disabled={!userInput.trim() || isJarvisThinking}
-                className="bg-cyan-950 border border-cyan-500/30 hover:border-cyan-500 text-cyan-400 p-2.5 rounded-xl flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed outline-none focus:outline-none"
-              >
-                <Send className="w-3.5 h-3.5" />
-              </button>
-            </div>
+                {/* If no research completed yet, show placeholder */}
+                {!isResearching && !researchSummary && (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-8 border border-dashed border-slate-900 rounded-2xl bg-slate-950/20 min-h-[160px]">
+                    <Compass className="w-8 h-8 text-slate-600 mb-2.5 animate-spin-slow" />
+                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-extrabold">DEEP CORES READY FOR SYNC</span>
+                    <p className="text-[10px] text-slate-500 max-w-sm mt-1">
+                      No trend data has been compiled in this workspace. Launch research above to trigger autonomous mathematical mapping.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
           </div>
         </section>
@@ -7318,6 +7800,9 @@ We have a confident cross-reference match with our database!
         onToggleTTS={() => setIsTTSEnabled(!isTTSEnabled)}
         onApplyNumbers={(nums) => setProposedNumbers(nums)}
         addToast={addToast}
+        messages={messages}
+        isThinking={isJarvisThinking}
+        onSendMessage={sendJarvisMessage}
       />
 
     </div>

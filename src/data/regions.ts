@@ -123,6 +123,30 @@ export const REGIONS_DATABASE: RegionGrid[] = [
           { id: '14', date: '2026-03-14', numbers: [5, 12, 19, 27, 36, 45] },
           { id: '15', date: '2026-03-07', numbers: [2, 10, 17, 26, 34, 43] }
         ]
+      },
+      {
+        id: 'ca-bc-649',
+        name: 'BC 6/49 (Pacific Grid)',
+        description: 'British Columbia provincial lottery, synchronized over the cascade of Pacific coast coordinates.',
+        formula: '6 / 49 Pacific Coordinate Stream',
+        schedule: 'Wednesday & Saturday, 10:30 PM PST',
+        draws: [
+          { id: '1', date: '2026-06-10', numbers: [6, 12, 19, 28, 37, 44] },
+          { id: '2', date: '2026-06-06', numbers: [3, 15, 22, 31, 39, 47] },
+          { id: '3', date: '2026-06-03', numbers: [1, 9, 14, 25, 33, 41] },
+          { id: '4', date: '2026-05-30', numbers: [5, 11, 20, 27, 36, 49] },
+          { id: '5', date: '2026-05-27', numbers: [7, 18, 24, 30, 38, 45] },
+          { id: '6', date: '2026-05-23', numbers: [2, 10, 16, 29, 35, 42] },
+          { id: '7', date: '2026-05-20', numbers: [8, 13, 21, 32, 40, 48] },
+          { id: '8', date: '2026-05-16', numbers: [4, 17, 23, 26, 34, 43] },
+          { id: '9', date: '2026-05-13', numbers: [11, 15, 22, 28, 37, 46] },
+          { id: '10', date: '2026-05-09', numbers: [9, 14, 20, 31, 39, 47] },
+          { id: '11', date: '2026-05-06', numbers: [3, 12, 18, 25, 33, 41] },
+          { id: '12', date: '2026-05-02', numbers: [6, 10, 19, 27, 36, 44] },
+          { id: '13', date: '2026-04-29', numbers: [1, 8, 15, 24, 32, 49] },
+          { id: '14', date: '2026-04-25', numbers: [5, 13, 22, 30, 38, 45] },
+          { id: '15', date: '2026-04-22', numbers: [7, 11, 16, 29, 35, 42] }
+        ]
       }
     ]
   },
