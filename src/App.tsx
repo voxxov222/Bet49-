@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { db, collection, addDoc, getDocs, query, orderBy, onSnapshot, limit } from './lib/firebase';
 import QuantumBootloader from './components/QuantumBootloader';
 import InteractiveOrbitalMenu from './components/InteractiveOrbitalMenu';
 import OmniQuantum3DSpace from './components/OmniQuantum3DSpace';
@@ -29,7 +30,7 @@ import {
   HelpCircle, Settings, Play, Pause, Send, ArrowRight, 
   Plus, Trash2, Database, Layers, Sparkles, Network, 
   ChevronRight, Volume2, VolumeX, Square, ExternalLink, Menu, X, Copy, Check, Sliders, Activity, Grid, Hexagon,
-  Calendar, Clock, History as HistoryIcon, Eye
+  Calendar, Clock, History as HistoryIcon, Eye, Sun, Moon
 } from 'lucide-react';
 
 // Define structures
@@ -47,6 +48,15 @@ interface Message {
   timestamp: string;
   webSources?: { title: string; uri: string }[];
   commandExecuted?: { name: string; info: string };
+}
+
+interface StoredPrediction {
+  id?: string;
+  timestamp: string;
+  strategyId: string;
+  numbers: number[];
+  bonus?: number | null;
+  targetDrawDate?: string;
 }
 
 // Preset historical Lotto 649 draws for seed data
@@ -173,9 +183,11 @@ export default function App() {
   const [selectedStrategy, setSelectedStrategy] = useState<string>('freq-10');
   const [proposedNumbers, setProposedNumbers] = useState<number[]>([]);
   const [proposedBonusNumber, setProposedBonusNumber] = useState<number | null>(25);
+  const [storedPredictions, setStoredPredictions] = useState<StoredPrediction[]>([]);
   const [isWCLCStreamOpen, setIsWCLCStreamOpen] = useState(false);
   const [showSplash, setShowSplash] = useState<boolean>(true);
   const [copied, setCopied] = useState<boolean>(false);
+  const [isLightTheme, setIsLightTheme] = useState<boolean>(false);
 
   // Advanced Visual UX / Toast & Calculating States
   const [activeCategory, setActiveCategory] = useState<'engines' | 'analytics' | 'summary' | 'data' | 'jarvis' | 'simple' | 'swarms' | 'string3d' | 'qvm'>('engines');
@@ -328,6 +340,19 @@ export default function App() {
       return () => clearInterval(interval);
     }
   }, [proposedNumbers]);
+
+  const [scrambleVals, setScrambleVals] = useState<number[]>(Array(7).fill(1));
+
+  // Scramble animation effect loop
+  useEffect(() => {
+    let scrambleInterval: NodeJS.Timeout;
+    if (isCalculating) {
+      scrambleInterval = setInterval(() => {
+        setScrambleVals(Array(7).fill(0).map(() => Math.floor(Math.random() * 49) + 1));
+      }, 50);
+    }
+    return () => clearInterval(scrambleInterval);
+  }, [isCalculating]);
 
   // Command control mainframe target simulation
   const triggerManualCalculation = () => {
@@ -525,6 +550,20 @@ export default function App() {
     localStorage.setItem('bet49_draws', JSON.stringify(draws));
     calculateProposedNumbers();
   }, [draws, selectedStrategy, offsets369, minSumFilter, maxSumFilter, maxConsecutiveFilter, selectedCyclicPrime, lookbackDepth]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'predictions'), orderBy('timestamp', 'desc'), limit(100));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const preds: StoredPrediction[] = [];
+      snapshot.forEach(doc => {
+        preds.push({ id: doc.id, ...doc.data() } as StoredPrediction);
+      });
+      setStoredPredictions(preds);
+    }, (error) => {
+      console.error("Firestore Error: ", error);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Scroll to bottom of chat
   useEffect(() => {
@@ -2796,6 +2835,33 @@ export default function App() {
     return rates;
   }, [draws, offsets369, lookbackDepth, selectedCyclicPrime]);
 
+  const strategyWinningStreaks = useMemo(() => {
+    const streaks: Record<string, number> = {};
+    const sortedLast = [...draws].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    STRATEGIES.forEach(strat => {
+      let streak = 0;
+      const maxTestCount = Math.min(20, sortedLast.length - 1); 
+
+      for (let i = 0; i < maxTestCount; i++) {
+        const olderContext = sortedLast.slice(i + 1);
+        if (olderContext.length === 0) continue;
+
+        const proposed = getProposedNumbersForStrategy(strat.id, olderContext);
+        const actual = sortedLast[i].numbers;
+        const matches = proposed.filter(num => actual.includes(num)).length;
+
+        if (matches >= 3) {
+          streak++;
+        } else {
+          break;
+        }
+      }
+      streaks[strat.id] = streak;
+    });
+    return streaks;
+  }, [draws, offsets369, lookbackDepth, selectedCyclicPrime]);
+
   // Pure mathematical 7x7 Spiral Heatmap compiler for the last 50 drawings
   const spiralHeatmapData = useMemo(() => {
     const trace = draws.slice(0, 50);
@@ -3584,6 +3650,43 @@ export default function App() {
     setNewNumbers('');
     setDrawError(null);
 
+    // Cross-reference with stored predictions
+    let matchedPred: StoredPrediction | null = null;
+    let maxMatchCount = 0;
+
+    storedPredictions.forEach(pred => {
+      let count = 0;
+      pred.numbers.forEach(pn => {
+        if (sortedDraw.includes(pn)) count++;
+      });
+      if (count >= 3 && count > maxMatchCount) { // Let's define a winning match as 3 or more (or you can adjust logic)
+        maxMatchCount = count;
+        matchedPred = pred;
+      }
+    });
+
+    if (matchedPred) {
+      const matchMsg = `BINGO! Prediction match confirmed! You predicted ${maxMatchCount} matching numbers using ${matchedPred.strategyId}. Sequence: [${matchedPred.numbers.join(', ')}].`;
+      addToast('WINNING NUMBER PREDICTED', matchMsg, 'success');
+      playSpeech(`Alert. We have successfully predicted a winning node array. You matched ${maxMatchCount} targets.`);
+      
+      const popupContent = `
+## 🎉 Winning Prediction Confirmed!
+We have a confident cross-reference match with our database!
+- **Actual Draw**: [${sortedDraw.join(', ')}]
+- **Your Prediction**: [${matchedPred.numbers.join(', ')}]
+- **Matched Nodes**: ${maxMatchCount} / 6
+- **Strategy Used**: ${matchedPred.strategyId}
+- **Stored On**: ${new Date(matchedPred.timestamp).toLocaleDateString()}
+      `;
+      setJarvisPopup({
+        isOpen: true,
+        title: "Prediction Database Match",
+        content: popupContent,
+        imagePrompt: null
+      });
+    }
+
     // Prompt Jarvis to comment on user added draw
     const msg = `System update: I added a new Lotto 6/49 drawing on ${newDate} representing coordinates: ${sortedDraw.join(', ')}. Please analyze system recalibration.`;
     sendJarvisMessage(msg);
@@ -3622,15 +3725,22 @@ export default function App() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleApplyToDatabase = () => {
-    const today = new Date().toISOString().split('T')[0];
-    const item: LottoDraw = {
-      id: Math.random().toString(),
-      date: today,
-      numbers: [...proposedNumbers]
-    };
-    setDraws(prev => [item, ...prev]);
-    addToast('DATABASE RECORD LOCKED', `Core sequence [${proposedNumbers.join(', ')}] archived under stamp ${today}.`, 'success');
+  const handleSavePrediction = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const docRef = await addDoc(collection(db, 'predictions'), {
+        timestamp: new Date().toISOString(),
+        targetDrawDate: today,
+        strategyId: selectedStrategy,
+        numbers: [...proposedNumbers],
+        bonus: proposedBonusNumber
+      });
+      addToast('PREDICTION DATABASING', `Prediction [${proposedNumbers.join(', ')}] logged permanently to Firebase.`, 'success');
+      playSpeech("Prediction successfully recorded to central mainframe database.");
+    } catch (e: any) {
+      console.error(e);
+      addToast('ERROR', `Failed to save prediction: ${e.message}`, 'error');
+    }
   };
 
   // Toggle individual offsets in 369 cascade mode
@@ -3657,7 +3767,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans relative overflow-hidden selection:bg-cyan-500 selection:text-slate-950">
+    <div className={`min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans relative overflow-hidden selection:bg-cyan-500 selection:text-slate-950 ${isLightTheme ? 'theme-light' : ''}`}>
       
       {/* Quantum Calibration System Bootloader */}
       <AnimatePresence mode="wait">
@@ -3751,9 +3861,18 @@ export default function App() {
               <span className="text-lg font-mono font-bold tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 select-none">bet49</span>
               <span className="text-[10px] bg-cyan-950 text-cyan-400 font-mono px-1.5 py-0.5 rounded border border-cyan-500/30 uppercase tracking-widest">Jarvis vTC-649</span>
             </div>
-            <p className="text-[11px] text-slate-400 font-mono tracking-tight select-none uppercase">
-              HUB // <span className="text-cyan-400 font-extrabold">{selectedLotteryName}</span> <span className="text-slate-500">({selectedRegionName})</span>
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] text-slate-400 font-mono tracking-tight select-none uppercase">
+                HUB // <span className="text-cyan-400 font-extrabold">{selectedLotteryName}</span> <span className="text-slate-500">({selectedRegionName})</span>
+              </p>
+              <div className="flex items-center gap-1.5 px-1.5 py-[1px] rounded bg-emerald-500/10 border border-emerald-500/30">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                </span>
+                <span className="text-[9px] font-mono text-emerald-400 font-bold tracking-widest uppercase">Live Status</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -3783,6 +3902,18 @@ export default function App() {
 
         {/* Action Controls */}
         <div className="flex items-center gap-4">
+          <button 
+            onClick={() => setIsLightTheme(!isLightTheme)}
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-900 border border-slate-700 hover:border-cyan-500/50 hover:bg-slate-800 transition-colors shadow-sm focus:outline-none"
+            aria-label="Toggle Theme"
+          >
+            {isLightTheme ? (
+              <Moon className="w-4 h-4 text-slate-400" />
+            ) : (
+              <Sun className="w-4 h-4 text-cyan-400" />
+            )}
+          </button>
+          
           <button 
             id="tts-toggle-btn"
             onClick={() => {
@@ -4479,6 +4610,7 @@ export default function App() {
             selectedStrategy={selectedStrategy}
             onSelectStrategy={setSelectedStrategy}
             strategyHitRates={strategyHitRates}
+            strategyWinningStreaks={strategyWinningStreaks}
             getStrategyCategory={getStrategyCategory}
           />
 
@@ -4487,14 +4619,38 @@ export default function App() {
             <span className="text-[10px] font-mono text-cyan-400/50 absolute top-4 right-6 tracking-widest">VISUAL METRIC CORE</span>
             
             {/* Strategy Title Display */}
-            <div className="border-b border-slate-800 pb-3 mb-4">
-              <h2 className="text-sm font-mono font-semibold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 uppercase tracking-widest flex items-center justify-between">
-                <span>{STRATEGIES.find(s => s.id === selectedStrategy)?.name}</span>
-                <span className="text-[10px] text-slate-500 font-normal">VOLATILITY OVERLAY ACTIVE</span>
-              </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                {STRATEGIES.find(s => s.id === selectedStrategy)?.desc}
-              </p>
+            <div className="border-b border-slate-800 pb-4 mb-4 flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <div className="flex-1">
+                <h2 className="text-sm font-mono font-semibold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 uppercase tracking-widest flex items-center">
+                  <span>{STRATEGIES.find(s => s.id === selectedStrategy)?.name}</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  {STRATEGIES.find(s => s.id === selectedStrategy)?.desc}
+                </p>
+              </div>
+
+              {/* Strategy Win-Probability Component */}
+              <div className="flex items-center gap-4 bg-slate-900/80 border border-slate-700/50 rounded-xl px-4 py-2.5 shrink-0 min-w-[220px] shadow-inner relative overflow-hidden group">
+                <div className="absolute inset-0 bg-emerald-500/5 group-hover:bg-emerald-500/10 transition-colors pointer-events-none"></div>
+                <div className="flex flex-col z-10 w-full">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                      <HistoryIcon className="w-3 h-3 text-emerald-400" />
+                      Backtest Win-Rate
+                    </span>
+                    <span className="text-sm font-mono font-bold text-emerald-400 drop-shadow-[0_0_5px_rgba(16,185,129,0.3)]">
+                      {(strategyHitRates[selectedStrategy]?.hitRate || 35).toFixed(1)}%
+                    </span>
+                  </div>
+                  {/* Visual Probability Bar */}
+                  <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800 shadow-inner">
+                    <div 
+                      className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.6)] transition-all duration-1000 ease-out"
+                      style={{ width: `${strategyHitRates[selectedStrategy]?.hitRate || 35}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* VOLATILITY TREND CHART (Recharts) */}
@@ -5436,10 +5592,12 @@ export default function App() {
                     </div>
                   ) : (
                     <>
-                      {proposedNumbers.map((num, idx) => {
-                        const isRevealed = idx < revealCount;
+                      {proposedNumbers.map((baseNum, idx) => {
+                        const num = isCalculating ? scrambleVals[idx] : baseNum;
+                        const isRevealed = isCalculating || idx < revealCount;
                         const category = getStrategyCategory(selectedStrategy);
                         const freq = getNumberFrequency(num);
+                        const calculateStyle = isCalculating ? { transform: `rotate(${scrambleVals[idx] * 12}deg) scale(1.1)` } : {};
                         
                         return (
                           <div 
@@ -5453,7 +5611,7 @@ export default function App() {
                                 category.color === 'purple' ? 'border-purple-400' :
                                 category.color === 'magenta' ? 'border-pink-500' : 'border-amber-400'
                               }`}
-                              style={{ animationDuration: '7s' }} />
+                              style={{ animationDuration: isCalculating ? '0.5s' : '7s' }} />
                             )}
                             
                             {/* Rotating glow halo under orb */}
@@ -5467,11 +5625,12 @@ export default function App() {
 
                             {/* Glowing sphere orb */}
                             <div 
-                              className={`w-[40px] h-[40px] rounded-full flex items-center justify-center font-bold text-sm font-mono transition-all duration-500 relative cursor-help select-none border shadow-md active:scale-95 ${
+                              style={calculateStyle}
+                              className={`w-[40px] h-[40px] rounded-full flex items-center justify-center font-bold text-sm font-mono transition-all duration-${isCalculating ? '75' : '500'} relative cursor-help select-none border shadow-md active:scale-95 ${
                                 isRevealed 
                                   ? `${category.glowClass} text-white ${category.borderClass} hover:scale-110` 
                                   : 'bg-slate-950 text-slate-700 border-slate-900 shadow-inner animate-pulse'
-                              }`}
+                              } ${isCalculating ? 'opacity-80 scale-110 blur-[1px]' : ''}`}
                             >
                               {isRevealed ? (
                                 <>
@@ -5511,43 +5670,52 @@ export default function App() {
                         );
                       })}
 
-                      {proposedBonusNumber !== null && (
-                        <div className="relative group flex items-center justify-center font-mono">
-                          {/* Spinning square orbital boundary */}
-                          <div className="absolute w-12 h-12 rounded border border-dashed border-rose-500/80 animate-spin pointer-events-none opacity-40 animate-[spin_10s_linear_infinite]" />
-                          
-                          {/* Rotating glow halo under square */}
-                          <div className="absolute inset-0 rounded blur-[10px] bg-rose-500/30 animate-pulse pointer-events-none" />
+                      {proposedBonusNumber !== null && (() => {
+                        const bNum = isCalculating ? scrambleVals[6] : proposedBonusNumber;
+                        const calculateStyle = isCalculating ? { transform: `rotate(${scrambleVals[6] * 12}deg) scale(1.1)` } : {};
+                        return (
+                          <div className="relative group flex items-center justify-center font-mono">
+                            {/* Spinning square orbital boundary */}
+                            <div className={`absolute w-12 h-12 rounded border border-dashed border-rose-500/80 animate-spin pointer-events-none opacity-40`} style={{ animationDuration: isCalculating ? '0.5s' : '10s' }} />
+                            
+                            {/* Rotating glow halo under square */}
+                            <div className="absolute inset-0 rounded blur-[10px] bg-rose-500/30 animate-pulse pointer-events-none" />
 
-                          {/* Glowing square box */}
-                          <div 
-                            className="w-[40px] h-[40px] rounded-lg bg-rose-950 border border-rose-500/50 hover:border-rose-450 hover:scale-110 flex items-center justify-center font-bold text-sm font-mono text-rose-200 shadow-[0_0_15px_rgba(239,68,68,0.25)] transition-all duration-500 relative cursor-help select-none"
-                          >
-                            <span className="z-10">{proposedBonusNumber}</span>
-                            <div className="absolute inset-0.5 rounded bg-gradient-to-tr from-transparent via-white/5 to-white/20 pointer-events-none" />
-                          </div>
+                            {/* Glowing square box */}
+                            <div 
+                              style={calculateStyle}
+                              className={`w-[40px] h-[40px] rounded-lg bg-rose-950 border border-rose-500/50 flex items-center justify-center font-bold text-sm font-mono text-rose-200 transition-all duration-${isCalculating ? '75' : '500'} relative cursor-help select-none ${
+                                isCalculating ? 'opacity-80 scale-110 blur-[1px]' : 'hover:border-rose-450 hover:scale-110 shadow-[0_0_15px_rgba(239,68,68,0.25)]'
+                              }`}
+                            >
+                              <span className="z-10">{bNum}</span>
+                              <div className="absolute inset-0.5 rounded bg-gradient-to-tr from-transparent via-white/5 to-white/20 pointer-events-none" />
+                            </div>
 
-                          {/* Cyber holographic hover metric stats popup */}
-                          <div className="absolute bottom-full mb-3 bg-slate-950/95 backdrop-blur-xl text-[9px] font-mono text-slate-200 px-3 py-2 rounded-xl border border-slate-800 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 z-[60] whitespace-nowrap shadow-[0_5px_15px_rgba(0,0,0,0.6)] transform translate-y-2 group-hover:translate-y-0 flex flex-col gap-0.5 min-w-[140px] select-none">
-                            <div className="flex justify-between items-center border-b border-rose-950 pb-1 mb-1">
-                              <span className="text-rose-400 font-extrabold font-mono uppercase">BONUS NODE-{proposedBonusNumber}</span>
-                              <span className="text-rose-500 bg-rose-950/50 px-1 rounded text-[7px] font-bold">STATE: ACTIVE</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-500 font-mono">ROLE:</span>
-                              <span className="text-red-400 font-mono font-bold">BONUS SEGMENT</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-500 font-mono">APPEARANCES:</span>
-                              <span className="text-slate-200 font-bold">{getNumberFrequency(proposedBonusNumber).count} DRAWS</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-500 font-mono">PROB WEIGHT:</span>
-                              <span className="text-rose-400 font-bold">{getNumberFrequency(proposedBonusNumber).rate}%</span>
-                            </div>
+                            {/* Cyber holographic hover metric stats popup */}
+                            {!isCalculating && (
+                              <div className="absolute bottom-full mb-3 bg-slate-950/95 backdrop-blur-xl text-[9px] font-mono text-slate-200 px-3 py-2 rounded-xl border border-slate-800 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 z-[60] whitespace-nowrap shadow-[0_5px_15px_rgba(0,0,0,0.6)] transform translate-y-2 group-hover:translate-y-0 flex flex-col gap-0.5 min-w-[140px] select-none">
+                                <div className="flex justify-between items-center border-b border-rose-950 pb-1 mb-1">
+                                  <span className="text-rose-400 font-extrabold font-mono uppercase">BONUS NODE-{bNum}</span>
+                                  <span className="text-rose-500 bg-rose-950/50 px-1 rounded text-[7px] font-bold">STATE: ACTIVE</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-500 font-mono">ROLE:</span>
+                                  <span className="text-red-400 font-mono font-bold">BONUS SEGMENT</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-500 font-mono">APPEARANCES:</span>
+                                  <span className="text-slate-200 font-bold">{getNumberFrequency(bNum).count} DRAWS</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-500 font-mono">PROB WEIGHT:</span>
+                                  <span className="text-rose-400 font-bold">{getNumberFrequency(bNum).rate}%</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </>
                   )}
                 </div>
@@ -5581,11 +5749,11 @@ export default function App() {
                   <span>{copied ? 'TRANSFERRED' : 'COPY'}</span>
                 </button>
                 <button
-                  id="apply-draw-btn"
-                  onClick={handleApplyToDatabase}
+                  id="save-prediction-btn"
+                  onClick={handleSavePrediction}
                   className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white px-5 py-2.5 rounded-xl text-xs font-mono transition-all duration-300 shadow-md border border-cyan-400/20 focus:outline-none select-none active:scale-95 hover:shadow-[0_0_12px_rgba(6,182,212,0.25)]"
                 >
-                  LOCK RECORD
+                  SAVE PREDICTION TO DB
                 </button>
               </div>
             </div>

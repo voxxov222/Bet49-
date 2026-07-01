@@ -19,6 +19,7 @@ interface InteractiveOrbitalMenuProps {
   selectedStrategy: string;
   onSelectStrategy: (id: string) => void;
   strategyHitRates: Record<string, StrategyHitRate>;
+  strategyWinningStreaks: Record<string, number>;
   getStrategyCategory: (stratId: string) => {
     name: string;
     color: string;
@@ -33,6 +34,7 @@ export default function InteractiveOrbitalMenu({
   selectedStrategy,
   onSelectStrategy,
   strategyHitRates,
+  strategyWinningStreaks,
   getStrategyCategory
 }: InteractiveOrbitalMenuProps) {
   const [activeCategory, setActiveCategory] = useState<string>('Statistical');
@@ -196,6 +198,11 @@ export default function InteractiveOrbitalMenu({
                         : 'bg-cyan-950/60 border-cyan-500/30 text-cyan-300'
                     }`}>
                       {stats.hitRate}% HIT
+                    </span>
+                  )}
+                  {strategyWinningStreaks[strat.id] !== undefined && strategyWinningStreaks[strat.id] > 0 && (
+                    <span className="text-[8px] font-mono font-black border px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 bg-amber-950/60 border-amber-500/30 text-amber-300">
+                      {strategyWinningStreaks[strat.id]} STREAK
                     </span>
                   )}
                 </div>
