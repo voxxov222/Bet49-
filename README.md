@@ -35,7 +35,7 @@ By modeling datasets spatially across 49-node geometries, it attempts to visuali
 
 ---
 
-## 💻 Google Quantum Willow Core Simulation
+## 💻 Google Quantum Willow Core processing
 
 This iteration transitions to a massively scalable **Google Quantum Willow** integration. The Virtual Quantum Machine (QVM) within the tactical hub simulates the layout of a densely intertwined superconducting lattice array. 
 
