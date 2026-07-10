@@ -215,6 +215,13 @@ sys.exit(0)
           description: 'Open-source quantum chemistry and materials chemistry library for mapping physical electronic structures onto qubits.',
           url: 'https://github.com/quantumlib/OpenFermion.git',
           type: 'Quantum Chemistry'
+        },
+        {
+          id: 'dwave-ocean-sdk',
+          name: 'D-Wave Ocean SDK (D-Wave)',
+          description: 'A suite of open-source Python tools for solving hard problems with quantum annealing, Ising models, and QUBO mappings.',
+          url: 'https://github.com/dwavesystems/dwave-ocean-sdk.git',
+          type: 'Annealing & Optimization'
         }
       ];
 
@@ -285,7 +292,8 @@ sys.exit(0)
       'Qualtran': 'https://github.com/quantumlib/Qualtran.git',
       'quantum': 'https://github.com/tensorflow/quantum.git',
       'qsim': 'https://github.com/quantumlib/qsim.git',
-      'OpenFermion': 'https://github.com/quantumlib/OpenFermion.git'
+      'OpenFermion': 'https://github.com/quantumlib/OpenFermion.git',
+      'dwave-ocean-sdk': 'https://github.com/dwavesystems/dwave-ocean-sdk.git'
     };
 
     const targetUrl = repoMap[libraryId];
@@ -929,7 +937,7 @@ My active systems report 10mK Cryogenic temperature and 99.85% Gate Fidelity wit
         1. dependency_install: Use if user wants to install packages/dependencies (e.g. "install scipy", "pip install qiskit", "install pandas"). 
            Structure: { "type": "dependency_install", "target": "scipy" }
         2. git_clone: Use if user wants to clone github repositories (e.g. "clone pennylane", "download qsim from github").
-           Structure: { "type": "git_clone", "target": "covalent" }  (Supports covalent, Qualtran, quantum, qsim, OpenFermion)
+           Structure: { "type": "git_clone", "target": "covalent" }  (Supports covalent, Qualtran, quantum, qsim, OpenFermion, dwave-ocean-sdk)
         3. write_code: Use if the user requests to write, generate, or create a custom python or JavaScript program (e.g. "write code for Grover's search in python", "create a bell state simulator script").
            Structure: { "type": "write_code", "filename": "vqe_solver.py", "code": "full clean executable python code here" }
         4. run_code: Use if the user tells you to run or execute a script they just created (e.g. "run the bell state python script").

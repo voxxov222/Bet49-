@@ -6,7 +6,8 @@ const repos = [
   'https://github.com/tensorflow/quantum.git',
   'https://github.com/quantumlib/qsim.git',
   'https://github.com/quantumlib/OpenFermion.git',
-  'https://github.com/AgnostiqHQ/covalent.git'
+  'https://github.com/AgnostiqHQ/covalent.git',
+  'https://github.com/dwavesystems/dwave-ocean-sdk.git'
 ];
 
 if (!fs.existsSync('./quantum_libraries')) {

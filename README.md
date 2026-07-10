@@ -8,13 +8,23 @@
   <p align="center">
     Powered by the phenomenal synergy of <strong>Google Quantum Willow</strong> and swarm-based Proactive AI Agents to compute highly complex state vectors and probability heatmaps across multiple geographic matrices.
   </p>
-
+  
   <div>
     <img src="https://img.shields.io/badge/System_Status-ONLINE-06b6d4?style=for-the-badge&logo=opsgenie&logoColor=white" alt="Status" />
     <img src="https://img.shields.io/badge/Quantum_Core-WILLOW_PINK_105_QUBIT-ec4899?style=for-the-badge&logo=probot&logoColor=white" alt="Quantum Core" />
     <img src="https://img.shields.io/badge/OS_Version-v5.2-10b981?style=for-the-badge&logo=codewars&logoColor=white" alt="Version" />
     <img src="https://img.shields.io/badge/Render_Engine-WebGL/Canvas-f59e0b?style=for-the-badge&logo=webgl&logoColor=white" alt="Engine" />
   </div>
+</div>
+
+<br/>
+
+<div align="center">
+  <h3>🚀 Live Application</h3>
+  <a href="https://bet49-etvmigp2u-enterupteds-projects-e79e57e0.vercel.app/" target="_blank">
+    <img src="https://img.shields.io/badge/Vercel-Launch_Live_App-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Live App" />
+  </a>
+  <p><strong><a href="https://bet49-etvmigp2u-enterupteds-projects-e79e57e0.vercel.app/" target="_blank">https://bet49-etvmigp2u-enterupteds-projects-e79e57e0.vercel.app/</a></strong></p>
 </div>
 
 <br/>
@@ -27,11 +37,17 @@
 
 <br/>
 
+<div align="center">
+  <!-- NOTE: Update this src when the Matrix Spiral image is committed to your repository -->
+  <img src="./src/assets/images/matrix_spiral_v9_4.jpg" alt="Matrix Spiral V9.4 - Tetrahedron Seed Matrix" width="100%" style="border-radius: 12px; border: 1px solid #06b6d4; box-shadow: 0 0 20px rgba(6,182,212,0.35);">
+  <p><em>* Matrix Spiral V9.4 (Tetrahedron Seed Matrix) visualizing the 6/49 coordinate geometry.</em></p>
+</div>
+
+<br/>
+
 ## 🌌 The Genesis: bet49 Tactical Hub
 
-The **bet49 TACTICAL HUB OS v5.2** is a highly conceptual visualization platform designed for analyzing, simulating, and generating lottery permutations. It leverages the cutting-edge concepts of global coordinate lattices, complex state vectors, and swarm-driven probabilistic artificial intelligence. 
-
-By modeling datasets spatially across 49-node geometries, it attempts to visualize patterns from randomness through the simulated lens of near-future quantum computing.
+The **bet49 TACTICAL HUB OS v5.2** is a highly conceptual visualization platform designed for analyzing, simulating, and generating lottery permutations. It leverages the cutting-edge concepts of global coordinate lattices, complex state vectors, and swarm-driven probabilistic artificial intelligence. By modeling datasets spatially across 49-node geometries, it attempts to visualize patterns from randomness through the simulated lens of near-future quantum computing.
 
 ---
 

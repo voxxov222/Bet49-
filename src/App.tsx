@@ -20,6 +20,8 @@ import KagglehubDatasetSync from './components/KagglehubDatasetSync';
 import StrategyProbabilityHeatmap from './components/StrategyProbabilityHeatmap';
 import QuantumStringTabSpace from './components/QuantumStringTabSpace';
 import QuantumVirtualMachine from './components/QuantumVirtualMachine';
+import QuantumSuperpositionVisualizer from './components/QuantumSuperpositionVisualizer';
+import QuantumPredictionEngine from './components/QuantumPredictionEngine';
 import QuantumQubitTerminal from './components/QuantumQubitTerminal';
 import FloatingAgentJarvis from './components/FloatingAgentJarvis';
 import Markdown from 'react-markdown';
@@ -191,9 +193,28 @@ export default function App() {
   const [showSplash, setShowSplash] = useState<boolean>(true);
   const [copied, setCopied] = useState<boolean>(false);
   const [isLightTheme, setIsLightTheme] = useState<boolean>(false);
+  const [particles, setParticles] = useState<any[]>([]);
+
+  // Dashy Config State
+  const [dashyConfig, setDashyConfig] = useState<{
+    theme: string;
+    layout: 'stack' | 'grid' | 'masonry';
+    compact: boolean;
+    sections: { id: string; name: string; widgets: string[] }[];
+  }>(() => {
+    const saved = localStorage.getItem('dashy_config');
+    return saved ? JSON.parse(saved) : {
+      theme: 'default',
+      layout: 'grid',
+      compact: false,
+      sections: [
+        { id: '1', name: 'Primary Engines', widgets: [] }
+      ]
+    };
+  });
 
   // Advanced Visual UX / Toast & Calculating States
-  const [activeCategory, setActiveCategory] = useState<'engines' | 'analytics' | 'summary' | 'data' | 'jarvis' | 'simple' | 'swarms' | 'string3d' | 'qvm'>('engines');
+  const [activeCategory, setActiveCategory] = useState<'engines' | 'analytics' | 'summary' | 'data' | 'jarvis' | 'simple' | 'swarms' | 'string3d' | 'qvm' | 'dashy' | 'dashy_view'>('engines');
   const [toasts, setToasts] = useState<{ id: string; type: 'success' | 'info' | 'error' | 'warning'; title: string; message: string }[]>([]);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isControlPanelOpen, setIsControlPanelOpen] = useState(false);
@@ -214,6 +235,23 @@ export default function App() {
   const [isComparing, setIsComparing] = useState<boolean>(false);
   const [compareProgress, setCompareProgress] = useState<number>(0);
   const [compareLogs, setCompareLogs] = useState<string[]>([]);
+
+  // Dashy View Helpers
+  const isWidgetVisible = (widgetId: string) => {
+    if (activeCategory === widgetId) return true;
+    if (activeCategory === 'dashy_view') {
+      return dashyConfig.sections.some(s => s.widgets.includes(widgetId));
+    }
+    return false;
+  };
+
+  const getWidgetOrder = (widgetId: string) => {
+    if (activeCategory !== 'dashy_view') return 0;
+    // Find the order index based on the flattened list of widgets across sections
+    const flattenedWidgets = dashyConfig.sections.flatMap(s => s.widgets);
+    const index = flattenedWidgets.indexOf(widgetId);
+    return index !== -1 ? index : 999;
+  };
   const [comparePredictionRevealed, setComparePredictionRevealed] = useState<boolean>(false);
 
   // Jarvis Popup State
@@ -560,6 +598,11 @@ export default function App() {
     calculateProposedNumbers();
     generateBatchOfTickets(selectedStrategy, draws);
   }, [draws, selectedStrategy, offsets369, minSumFilter, maxSumFilter, maxConsecutiveFilter, selectedCyclicPrime, lookbackDepth]);
+
+  useEffect(() => {
+    localStorage.setItem('dashy_config', JSON.stringify(dashyConfig));
+    document.body.className = `theme-${dashyConfig.theme} ${isLightTheme ? 'theme-light' : ''}`;
+  }, [dashyConfig, isLightTheme]);
 
   useEffect(() => {
     const q = query(collection(db, 'predictions'), orderBy('timestamp', 'desc'), limit(100));
@@ -4163,7 +4206,9 @@ We have a confident cross-reference match with our database!
             { id: 'qvm', label: '⚛️ QUANTUM VM' },
             { id: 'summary', label: 'INSIGHTS & SUMMARY' },
             { id: 'data', label: 'HISTORICAL DATA' },
-            { id: 'jarvis', label: 'J.A.R.V.I.S. HUB' }
+            { id: 'jarvis', label: 'J.A.R.V.I.S. HUB' },
+            { id: 'dashy_view', label: '📊 BET DASHBOARD' },
+            { id: 'dashy', label: '🎛️ DASHBOARD BUILDER' }
           ].map(cat => (
             <button
                key={cat.id}
@@ -4184,7 +4229,53 @@ We have a confident cross-reference match with our database!
       {/* CORE DISPLAY FLOOR */}
       <main className="flex-1 max-w-7xl mx-auto w-full flex flex-col gap-6 p-4 sm:p-6 z-10 overflow-y-auto relative">
 
+        {/* 📊 BET DASHBOARD CANVAS EDITOR */}
+        {activeCategory === 'dashy_view' && (
+          <div className="w-full flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between bg-slate-900/40 border border-slate-800/80 rounded-xl p-3 shadow-inner">
+              <div className="flex items-center gap-3">
+                <Grid className="w-5 h-5 text-cyan-500" />
+                <span className="font-mono text-xs text-slate-300 font-bold uppercase tracking-widest">
+                  Custom Bet Dashboard
+                </span>
+                <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-400 font-mono">
+                  {dashyConfig.sections[0]?.widgets.length || 0} Widgets Active
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mt-3 sm:mt-0">
+                <button
+                  onClick={() => setActiveCategory('dashy')}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-mono rounded border border-slate-700 transition-colors flex items-center gap-2"
+                >
+                  <Settings className="w-3.5 h-3.5" /> Configure Layout
+                </button>
+              </div>
+            </div>
+
+            {dashyConfig.sections[0]?.widgets.length === 0 && (
+              <div className="w-full h-64 border-2 border-dashed border-slate-800 rounded-2xl flex flex-col items-center justify-center bg-slate-900/20 backdrop-blur-sm gap-4 mt-8">
+                <div className="w-16 h-16 rounded-full bg-slate-900 flex items-center justify-center border border-slate-800">
+                  <Plus className="w-8 h-8 text-slate-500" />
+                </div>
+                <div className="text-center">
+                  <h3 className="font-mono text-cyan-400 text-sm font-bold uppercase tracking-widest">Canvas is Empty</h3>
+                  <p className="text-slate-500 text-xs mt-2 max-w-sm">
+                    Open the Dashboard Builder to add analytic engines, prediction tools, and historical data to your personalized view.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveCategory('dashy')}
+                  className="mt-2 px-5 py-2.5 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/50 text-cyan-300 rounded-lg text-xs font-mono font-bold uppercase transition-all"
+                >
+                  Open Builder Menu
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Lotto 649 LIVE SCHEDULE AND HIGHLIGHT BANNER */}
+        {activeCategory !== 'dashy_view' && (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 bg-slate-900/60 backdrop-blur-md border border-cyan-500/20 rounded-2xl p-4 sm:p-5 shadow-[0_4px_30px_rgba(0,0,0,0.4)] relative overflow-hidden select-none">
           {/* Subtle neon linear reflection */}
           <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent" />
@@ -4268,33 +4359,45 @@ We have a confident cross-reference match with our database!
             </div>
           </div>
         </div>
+        )}
 
-        {/* SIMPLE ACCESSIBILITY PREDICTOR FOR BASIC USERS */}
-        {activeCategory === 'simple' && (
-          <SimplePredictorDeck
-            draws={draws}
+        <div className={`w-full ${
+          activeCategory === 'dashy_view' && dashyConfig.layout === 'grid' 
+            ? 'grid grid-cols-1 xl:grid-cols-2 gap-6 items-start'
+            : activeCategory === 'dashy_view' && dashyConfig.layout === 'masonry'
+            ? 'columns-1 xl:columns-2 gap-6 space-y-6 block'
+            : 'flex flex-col gap-6'
+        }`}>
+          {/* SIMPLE ACCESSIBILITY PREDICTOR FOR BASIC USERS */}
+        {isWidgetVisible('simple') && (
+          <section style={{ order: getWidgetOrder('simple') }} className="w-full">
+            <SimplePredictorDeck
+              draws={draws}
             activeProposedNumbers={proposedNumbers}
             playSpeech={playSpeech}
             isTTSEnabled={isTTSEnabled}
             addToast={addToast}
             onApplyNumbers={(nums) => setProposedNumbers(nums)}
           />
+          </section>
         )}
 
         {/* AI AGENT SWARMS FOR COLLABORATIVE MULTI-PATTERN ANALYSIS */}
-        {activeCategory === 'swarms' && (
-          <AgentSwarmEngine
-            draws={draws}
+        {isWidgetVisible('swarms') && (
+          <section style={{ order: getWidgetOrder('swarms') }} className="w-full">
+            <AgentSwarmEngine
+              draws={draws}
             playSpeech={playSpeech}
             isTTSEnabled={isTTSEnabled}
             addToast={addToast}
             onApplyNumbers={(nums) => setProposedNumbers(nums)}
           />
+          </section>
         )}
 
         {/* INSIGHTS & SUMMARY HUB */}
-        {activeCategory === 'summary' && (
-        <section className={`flex flex-col gap-5 w-full max-w-4xl mx-auto`}>
+        {isWidgetVisible('summary') && (
+        <section className={`flex flex-col gap-5 w-full max-w-4xl mx-auto`} style={{ order: getWidgetOrder('summary') }}>
           <div className="bg-black/32 backdrop-blur-xl border border-fuchsia-500/20 rounded-2xl p-6 md:p-8 flex flex-col gap-6 shadow-[0_4px_30px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.04)]">
             <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
               <Sparkles className="w-6 h-6 text-fuchsia-400" />
@@ -4639,8 +4742,8 @@ We have a confident cross-reference match with our database!
         )}
 
         {/* DATA HUB */}
-        {activeCategory === 'data' && (
-        <section className={`flex flex-col gap-5 w-full max-w-2xl mx-auto`}>
+        {isWidgetVisible('data') && (
+        <section className={`flex flex-col gap-5 w-full max-w-2xl mx-auto`} style={{ order: getWidgetOrder('data') }}>
           
           {/* Jarvis Pulsing Sphere Container */}
           <div className="bg-black/32 backdrop-blur-xl border border-cyan-500/15 rounded-2xl p-5 flex flex-col items-center justify-center relative group shadow-[0_4px_25px_rgba(3,7,18,0.55),inset_0_1px_1px_rgba(255,255,255,0.04),0_0_15px_rgba(6,182,212,0.01)] hover:border-cyan-500/30 hover:shadow-[0_0_25px_rgba(6,182,212,0.08)] transition-all duration-500">
@@ -4787,8 +4890,8 @@ We have a confident cross-reference match with our database!
         )}
 
         {/* QUANTUM ENGINES */}
-        {activeCategory === 'engines' && (
-        <section className="flex flex-col gap-6 w-full">
+        {isWidgetVisible('engines') && (
+        <section className="flex flex-col gap-6 w-full" style={{ order: getWidgetOrder('engines') }}>
           
           {/* Holographic Synapse Selector Core */}
           <InteractiveOrbitalMenu 
@@ -6277,8 +6380,8 @@ We have a confident cross-reference match with our database!
         )}
 
         {/* PATTERN ANALYTICS */}
-        {activeCategory === 'analytics' && (
-        <section className="flex flex-col gap-6 w-full">
+        {isWidgetVisible('analytics') && (
+        <section className="flex flex-col gap-6 w-full" style={{ order: getWidgetOrder('analytics') }}>
 
           {/* Probability Frequency 49-Node Grid Heatmap */}
           <StrategyProbabilityHeatmap
@@ -7333,8 +7436,8 @@ We have a confident cross-reference match with our database!
         )}
 
         {/* J.A.R.V.I.S. HUB */}
-        {activeCategory === 'jarvis' && (
-        <section className="flex flex-col gap-5 w-full max-w-2xl mx-auto h-[85vh]">
+        {isWidgetVisible('jarvis') && (
+        <section className="flex flex-col gap-5 w-full max-w-2xl mx-auto h-[85vh]" style={{ order: getWidgetOrder('jarvis') }}>
           
           <div className="bg-black/32 backdrop-blur-xl border border-cyan-500/15 rounded-2xl p-4 flex flex-col flex-1 h-full shadow-[0_4px_30px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.04)] hover:border-cyan-500/25 hover:shadow-[0_0_20px_rgba(6,182,212,0.05)] transition-all duration-500 justify-between relative overflow-hidden">
             <span className="text-[10px] font-mono text-cyan-500/50 absolute top-4 right-4 tracking-widest uppercase">TACTICAL COMMUNICATOR</span>
@@ -7627,9 +7730,160 @@ We have a confident cross-reference match with our database!
         </section>
         )}
 
+        {/* 🎛️ DASHBOARD BUILDER SECTION */}
+        {activeCategory === 'dashy' && (
+          <section className="flex flex-col gap-6 w-full">
+            <div className="bg-black/32 backdrop-blur-xl border border-cyan-500/15 rounded-2xl p-6 flex flex-col flex-1 shadow-[0_4px_30px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.04)] relative overflow-hidden">
+              <span className="text-[10px] font-mono text-cyan-400/50 absolute top-4 right-6 tracking-widest uppercase">Dashboard Builder</span>
+              
+              <div className="border-b border-slate-800 pb-4 mb-6">
+                <h2 className="text-sm font-mono font-semibold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 uppercase tracking-widest flex items-center">
+                  <Settings className="w-5 h-5 mr-3 text-cyan-400" />
+                  Customizable Dashboard Structure & Theme Tuning
+                </h2>
+                <p className="text-xs text-slate-400 mt-2">
+                  Tune the overall aesthetic and restructure the tools you use the most. All settings are persistently synced.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Theme & Look */}
+                <div className="flex flex-col gap-4">
+                  <h3 className="text-xs font-mono font-bold text-cyan-500 uppercase border-b border-slate-800 pb-2">Global Theme</h3>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    {['default', 'cyberpunk', 'dracula', 'hacker'].map(theme => (
+                      <button
+                        key={theme}
+                        onClick={() => setDashyConfig({ ...dashyConfig, theme })}
+                        className={`p-3 rounded-lg border flex items-center justify-between transition-all ${
+                          dashyConfig.theme === theme 
+                            ? 'bg-cyan-950/30 border-cyan-400 shadow-[inset_0_0_15px_rgba(6,182,212,0.15)] text-cyan-300' 
+                            : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-600'
+                        }`}
+                      >
+                        <span className="font-mono text-xs uppercase font-bold">{theme}</span>
+                        {dashyConfig.theme === theme && <Check className="w-4 h-4 text-cyan-400" />}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 flex flex-col gap-4">
+                    <h3 className="text-xs font-mono font-bold text-cyan-500 uppercase border-b border-slate-800 pb-2">Appearance Options</h3>
+                    
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${dashyConfig.compact ? 'bg-cyan-500/20 border-cyan-400' : 'bg-slate-900 border-slate-700'}`}>
+                        {dashyConfig.compact && <Check className="w-3.5 h-3.5 text-cyan-400" />}
+                      </div>
+                      <span className="text-xs font-mono text-slate-300 group-hover:text-cyan-300">Compact Layout Mode</span>
+                      <input 
+                        type="checkbox" 
+                        checked={dashyConfig.compact} 
+                        onChange={(e) => setDashyConfig({ ...dashyConfig, compact: e.target.checked })} 
+                        className="hidden" 
+                      />
+                    </label>
+
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isLightTheme ? 'bg-cyan-500/20 border-cyan-400' : 'bg-slate-900 border-slate-700'}`}>
+                        {isLightTheme && <Check className="w-3.5 h-3.5 text-cyan-400" />}
+                      </div>
+                      <span className="text-xs font-mono text-slate-300 group-hover:text-cyan-300">Force Light Contrast</span>
+                      <input 
+                        type="checkbox" 
+                        checked={isLightTheme} 
+                        onChange={(e) => setIsLightTheme(e.target.checked)} 
+                        className="hidden" 
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Dashboard Structure */}
+                <div className="flex flex-col gap-4">
+                  <h3 className="text-xs font-mono font-bold text-cyan-500 uppercase border-b border-slate-800 pb-2">Custom Dashboard Layout</h3>
+                  
+                  <div className="flex bg-slate-900 rounded p-1 mb-2">
+                    {['stack', 'grid', 'masonry'].map(layout => (
+                      <button
+                        key={layout}
+                        onClick={() => setDashyConfig({ ...dashyConfig, layout: layout as any })}
+                        className={`flex-1 py-1.5 text-[10px] font-mono uppercase rounded transition-colors ${
+                          dashyConfig.layout === layout 
+                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold' 
+                            : 'text-slate-500 hover:text-slate-300'
+                        }`}
+                      >
+                        {layout} Mode
+                      </button>
+                    ))}
+                  </div>
+
+                  <p className="text-[10px] font-mono text-slate-500">
+                    Your widgets will dynamically adjust based on the structural setting you choose above. Layout adjustments apply globally to the Core Display Floor.
+                  </p>
+
+                  <div className="mt-2 bg-slate-900/60 border border-slate-800 rounded-lg p-4">
+                    <h4 className="text-[10px] font-mono text-cyan-500/80 uppercase mb-3">Active Canvas Modules</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { id: 'simple', label: 'Simple Predictions' },
+                        { id: 'swarms', label: 'Agent Swarms' },
+                        { id: 'engines', label: 'Quantum Engines' },
+                        { id: 'analytics', label: 'Pattern Analytics' },
+                        { id: 'string3d', label: 'String Wireframe 3D' },
+                        { id: 'qvm', label: 'Quantum VM' },
+                        { id: 'summary', label: 'Insights & Summary' },
+                        { id: 'data', label: 'Historical Data' },
+                        { id: 'jarvis', label: 'J.A.R.V.I.S. Hub' }
+                      ].map(widget => {
+                        // Check if it's currently active (we can just add it to section 1 for simplicity if toggled)
+                        const isActive = dashyConfig.sections.some(s => s.widgets.includes(widget.id));
+                        
+                        return (
+                          <button
+                            key={widget.id}
+                            onClick={() => {
+                              const newSections = [...dashyConfig.sections];
+                              if (isActive) {
+                                newSections.forEach(s => {
+                                  s.widgets = s.widgets.filter(w => w !== widget.id);
+                                });
+                              } else {
+                                if (newSections.length > 0) {
+                                  newSections[0].widgets.push(widget.id);
+                                }
+                              }
+                              setDashyConfig({ ...dashyConfig, sections: newSections });
+                            }}
+                            className={`px-3 py-1.5 rounded border text-[9px] font-mono uppercase font-bold transition-all ${
+                              isActive 
+                                ? 'bg-cyan-950/40 border-cyan-500/40 text-cyan-300' 
+                                : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'
+                            }`}
+                          >
+                            {widget.label} {isActive && '✓'}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  
+                  <button 
+                    onClick={() => setActiveCategory('dashy_view')}
+                    className="mt-4 w-full py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-slate-950 font-mono font-black text-xs uppercase tracking-widest rounded-lg shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all active:scale-95"
+                  >
+                    LAUNCH MY CUSTOM DASHBOARD
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* 🌌 STRING WIREFRAME 3D SECTION */}
-        {activeCategory === 'string3d' && (
-          <section className="flex flex-col gap-5 w-full">
+        {isWidgetVisible('string3d') && (
+          <section className="flex flex-col gap-5 w-full" style={{ order: getWidgetOrder('string3d') }}>
             <QuantumStringTabSpace 
               draws={draws}
               activeProposedNumbers={proposedNumbers}
@@ -7642,8 +7896,8 @@ We have a confident cross-reference match with our database!
         )}
 
         {/* ⚛️ QUANTUM VIRTUAL MACHINE */}
-        {activeCategory === 'qvm' && (
-          <section className="flex flex-col gap-6 w-full">
+        {isWidgetVisible('qvm') && (
+          <section className="flex flex-col gap-6 w-full" style={{ order: getWidgetOrder('qvm') }}>
             <QuantumQubitTerminal 
               onApplyNumbers={(nums, bonus) => {
                 setProposedNumbers(nums);
@@ -7665,8 +7919,15 @@ We have a confident cross-reference match with our database!
               isTTSEnabled={isTTSEnabled}
               addToast={(title, message, type) => addToast(title, message, type as any)}
             />
+            <QuantumSuperpositionVisualizer 
+              particles={particles}
+              setParticles={setParticles}
+            />
+            <QuantumPredictionEngine particles={particles} />
           </section>
         )}
+
+        </div>
 
       </main>
 

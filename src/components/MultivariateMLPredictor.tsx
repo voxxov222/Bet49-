@@ -85,30 +85,51 @@ export default function MultivariateMLPredictor({
   onApplyNumbers
 }: MultivariateMLPredictorProps) {
   // Navigation tab states
-  const [activeTab, setActiveTab] = useState<'regression' | 'markov'>('regression');
+  const [activeTab, setActiveTab] = useState<'regression' | 'markov' | 'quantum_tensor'>('regression');
 
-  // Machine learning hyperparameters
+  // Machine learning hyperparameters (Standard Ridge)
   const [learningRate, setLearningRate] = useState<number>(0.05);
   const [lambda, setLambda] = useState<number>(0.01); // L2 regularization (Ridge regression)
   const [splitRatio, setSplitRatio] = useState<number>(75); // 75% train, 25% test
   const [totalEpochs, setTotalEpochs] = useState<number>(1000);
   
+  // Quantum-Inspired Multilinear Tensor Regression Hyperparameters
+  const [chebyshevOrder, setChebyshevOrder] = useState<number>(2); // T1 to T_order polynomial expansion
+  const [tensorRank, setTensorRank] = useState<number>(4); // Top SVD singular values
+  const [elasticNetAlpha, setElasticNetAlpha] = useState<number>(0.5); // L1 mixing ratio (Elastic Net)
+  const [l1Penalty, setL1Penalty] = useState<number>(0.005);
+  const [l2Penalty, setL2Penalty] = useState<number>(0.01);
+  const [tensorEpochs, setTensorEpochs] = useState<number>(500);
+
   // Interactive testing multimeter dial values
   const [probeSelectedNum, setProbeSelectedNum] = useState<number>(7);
   const [isTraining, setIsTraining] = useState<boolean>(false);
   const [trainProgress, setTrainProgress] = useState<number>(0);
 
-  // Model parameters state
+  // Standard Model parameters state
   const [weights, setWeights] = useState<number[]>([0.15, -0.10, 0.25, 0.05]);
   const [bias, setBias] = useState<number>(0.1);
   const [lossHistory, setLossHistory] = useState<LossHistoryPoint[]>([]);
   const [modelTrained, setModelTrained] = useState<boolean>(false);
 
+  // Quantum-Inspired Tensor Model Parameters State
+  const [tensorWeights1D, setTensorWeights1D] = useState<number[]>([]);
+  const [tensorBias, setTensorBias] = useState<number>(0.1);
+  const [tensorLossHistory, setTensorLossHistory] = useState<LossHistoryPoint[]>([]);
+  const [tensorModelTrained, setTensorModelTrained] = useState<boolean>(false);
+  const [isTensorTraining, setIsTensorTraining] = useState<boolean>(false);
+  const [tensorTrainProgress, setTensorTrainProgress] = useState<number>(0);
+
+  // Singular Value Decomposition States for Pattern Recognition
+  const [singularValues, setSingularValues] = useState<number[]>([]);
+  const [svdPotential, setSvdPotential] = useState<number[]>(Array(49).fill(0.1));
+  const [eigenvectors, setEigenvectors] = useState<number[][]>([]);
+
   // State for Jarvis Conversation Terminal
   const [jarvisMessages, setJarvisMessages] = useState<ChatMessage[]>([
     { 
       sender: 'jarvis', 
-      text: "Mainframe online, operator. I have compiled the multivariate telemetry grid. Select a visual protocol above or click any tactical command query to analyze next-sequence probabilities.", 
+      text: "Mainframe online, operator. I have compiled the multivariate telemetry grid and initialized the Quantum-Inspired Multilinear Tensor solver. Select a visual protocol above or click any tactical command query to analyze next-sequence probabilities.", 
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
     }
   ]);
@@ -277,7 +298,172 @@ export default function MultivariateMLPredictor({
       .slice(0, 6);
   }, [transitionMatrix, probeSelectedNum]);
 
-  // Combined Hybrid Model score - Fuses Ridge Regression Predictions & state-transition probabilities
+  // Singular Value Decomposition on Historical Draw Co-occurrence Covariance Matrix
+  const computeCovarianceAndSVD = (drawsList: LottoDraw[], rank: number) => {
+    if (drawsList.length === 0) return { singularValues: [], eigenvectors: [] };
+
+    const totalD = drawsList.length;
+    const meanOccur = 6 / 49;
+    const A: number[][] = Array.from({ length: totalD }, () => Array(49).fill(-meanOccur));
+    drawsList.forEach((draw, dIdx) => {
+      draw.numbers.forEach(num => {
+        if (num >= 1 && num <= 49) {
+          A[dIdx][num - 1] = 1 - meanOccur;
+        }
+      });
+    });
+
+    const C: number[][] = Array.from({ length: 49 }, () => Array(49).fill(0));
+    for (let i = 0; i < 49; i++) {
+      for (let j = 0; j < 49; j++) {
+        let sum = 0;
+        for (let d = 0; d < totalD; d++) {
+          sum += A[d][i] * A[d][j];
+        }
+        C[i][j] = sum / (totalD - 1 || 1);
+      }
+    }
+
+    const sValues: number[] = [];
+    const eVectors: number[][] = [];
+    const tempC = C.map(row => [...row]);
+
+    for (let r = 0; r < rank; r++) {
+      let v: number[] = Array.from({ length: 49 }, (_, idx) => Math.sin(idx + r + 1.2));
+      let norm = Math.sqrt(v.reduce((sum, val) => sum + val * val, 0));
+      v = v.map(val => val / (norm || 1));
+
+      for (let iter = 0; iter < 25; iter++) {
+        const nextV = Array(49).fill(0);
+        for (let i = 0; i < 49; i++) {
+          for (let j = 0; j < 49; j++) {
+            nextV[i] += tempC[i][j] * v[j];
+          }
+        }
+        const nextNorm = Math.sqrt(nextV.reduce((sum, val) => sum + val * val, 0));
+        v = nextV.map(val => val / (nextNorm || 1));
+      }
+
+      let lam = 0;
+      for (let i = 0; i < 49; i++) {
+        let rowSum = 0;
+        for (let j = 0; j < 49; j++) {
+          rowSum += tempC[i][j] * v[j];
+        }
+        lam += v[i] * rowSum;
+      }
+
+      sValues.push(Math.max(0.0001, lam));
+      eVectors.push(v);
+
+      for (let i = 0; i < 49; i++) {
+        for (let j = 0; j < 49; j++) {
+          tempC[i][j] -= lam * v[i] * v[j];
+        }
+      }
+    }
+
+    return { singularValues: sValues, eigenvectors: eVectors };
+  };
+
+  // Chebyshev polynomial terms of the first kind: T_n(x)
+  const chebyshevTerms = (x: number, order: number): number[] => {
+    const z = 2 * x - 1; // map [0,1] to [-1,1]
+    const terms: number[] = [];
+    for (let o = 1; o <= order; o++) {
+      const clampedZ = Math.max(-1.0, Math.min(1.0, z));
+      terms.push(Math.cos(o * Math.acos(clampedZ)));
+    }
+    return terms;
+  };
+
+  // Maps normalized feature vectors into Chebyshev Quantum state expansions
+  const constructFeatureVector = (item: FeatureVector, order: number): number[] => {
+    const v = [1]; // intercept term
+    v.push(...chebyshevTerms(item.freqVoltage, order));
+    v.push(...chebyshevTerms(item.recencyAmp, order));
+    v.push(...chebyshevTerms(item.harmonicRes, order));
+    v.push(...chebyshevTerms(item.spiralZ, order));
+    return v;
+  };
+
+  // Index mapping from 1D weight list to symmetric 2D outer product matrices
+  const getIndexMapping = (L: number) => {
+    const map: { i: number; j: number }[] = [];
+    for (let i = 0; i < L; i++) {
+      for (let j = i; j < L; j++) {
+        map.push({ i, j });
+      }
+    }
+    return map;
+  };
+
+  const L_curr = 1 + 4 * chebyshevOrder;
+  const map_curr = useMemo(() => getIndexMapping(L_curr), [L_curr]);
+
+  const tensorWeightsMatrix = useMemo(() => {
+    const L = 1 + 4 * chebyshevOrder;
+    const W = Array.from({ length: L }, () => Array(L).fill(0));
+    if (tensorWeights1D.length === 0) {
+      for (let i = 0; i < L; i++) {
+        for (let j = 0; j < L; j++) {
+          W[i][j] = 0.01 * Math.sin(i * j + 1.2);
+        }
+      }
+      return W;
+    }
+    map_curr.forEach(({ i, j }, idx) => {
+      const val = tensorWeights1D[idx] || 0;
+      W[i][j] = val;
+      W[j][i] = val;
+    });
+    return W;
+  }, [tensorWeights1D, chebyshevOrder, map_curr]);
+
+  // Evaluates Multilinear Tensor regression score for a single node
+  const tensorScoreForNode = (item: FeatureVector): number => {
+    const L = 1 + 4 * chebyshevOrder;
+    const v = constructFeatureVector(item, chebyshevOrder);
+    let yHat = tensorBias;
+    let idx = 0;
+    for (let i = 0; i < L; i++) {
+      for (let j = i; j < L; j++) {
+        const w_val = tensorWeights1D[idx] !== undefined 
+          ? tensorWeights1D[idx] 
+          : 0.01 * Math.sin(i * j + 1.2);
+        yHat += w_val * (v[i] * v[j]);
+        idx++;
+      }
+    }
+    return Math.max(0, yHat);
+  };
+
+  // Automated live background SVD pattern engine
+  useEffect(() => {
+    if (draws.length === 0) return;
+    const { singularValues: sVals, eigenvectors: eVects } = computeCovarianceAndSVD(draws, tensorRank);
+    setSingularValues(sVals);
+    setEigenvectors(eVects);
+
+    // Compute co-occurrence singular density loading for all 49 numbers
+    const potential = Array(49).fill(0);
+    for (let idx = 0; idx < 49; idx++) {
+      let sum = 0;
+      eVects.forEach((v, rIdx) => {
+        sum += sVals[rIdx] * Math.abs(v[idx]);
+      });
+      potential[idx] = sum;
+    }
+
+    // Min-Max normalize
+    const min = Math.min(...potential);
+    const max = Math.max(...potential);
+    const range = max - min || 1;
+    const normPotential = potential.map(p => (p - min) / range);
+    setSvdPotential(normPotential);
+  }, [draws, tensorRank]);
+
+  // Combined Tri-Hybrid Model score - Fuses Ridge Regression, Markov State Transitions, and Chebyshev Tensor + SVD Pattern recognition
   const hybridForecast = useMemo(() => {
     if (draws.length === 0) return [];
     
@@ -286,14 +472,14 @@ export default function MultivariateMLPredictor({
     const lastNums = lastDraw ? lastDraw.numbers : [];
 
     const hybridScores = dataset.map(item => {
-      // Regression Potential Y_Hat
+      // 1. Standard Regression Potential Y_Hat
       const yHat = weights[0] * item.freqVoltage + 
                    weights[1] * item.recencyAmp + 
                    weights[2] * item.harmonicRes + 
                    weights[3] * item.spiralZ + bias;
       const regScore = Math.max(0, yHat);
 
-      // Markov transition prior (average transition likelihood starting from the previous draw numbers)
+      // 2. Markov transition prior (average transition likelihood starting from previous draw numbers)
       let priorScore = 0;
       if (lastNums.length > 0) {
         let sumProb = 0;
@@ -305,17 +491,32 @@ export default function MultivariateMLPredictor({
         priorScore = 1 / 49;
       }
 
-      // Hybrid consensus: 50% regression, 50% sequential transition probability
+      // 3. Chebyshev Tensor + SVD co-occurrence Score
+      const tensorRegVal = tensorScoreForNode(item);
+      const svdVal = svdPotential[item.num - 1] || 0.1;
+      const tensorScore = tensorRegVal * 0.6 + svdVal * 0.4;
+
+      // Combine with equal weights (33% Ridge Regression, 33% Markov Transitions, 34% Chebyshev Tensor + SVD pattern Recognition)
       return {
         num: item.num,
         regScore,
         priorScore,
-        combined: regScore * 0.5 + priorScore * 0.5
+        tensorScore,
+        combined: regScore * 0.33 + priorScore * 0.33 + tensorScore * 0.34
       };
     });
 
-    return hybridScores.sort((a, b) => b.combined - a.combined).slice(0, 6);
-  }, [dataset, weights, bias, transitionMatrix, draws]);
+    // Min-Max normalize combined score to [0, 1]
+    const combinedVals = hybridScores.map(h => h.combined);
+    const minC = Math.min(...combinedVals);
+    const maxC = Math.max(...combinedVals);
+    const rangeC = maxC - minC || 1;
+
+    return hybridScores.map(h => ({
+      ...h,
+      displayScore: (h.combined - minC) / rangeC
+    })).sort((a, b) => b.combined - a.combined).slice(0, 6);
+  }, [dataset, weights, bias, transitionMatrix, draws, chebyshevOrder, tensorWeights1D, tensorBias, svdPotential]);
 
   // Read raw telemetry metrics for selected probe node
   const activeProbeStats = useMemo(() => {
@@ -456,6 +657,146 @@ export default function MultivariateMLPredictor({
         addToast(
           "OPTIMAL CONVERGENCE REACHED",
           `Model convergence success. Train MSE: ${finalTrainL.toFixed(4)}, Test MSE: ${finalTestL.toFixed(4)}. calibrated weights locked.`,
+          "success"
+        );
+      }
+    }, 45);
+  };
+
+  // Train the Chebyshev Multilinear Tensor Regression model via Coordinate Descent with L1/L2 Elastic Net penalties
+  const runTensorTraining = () => {
+    if (isTensorTraining) return;
+    setIsTensorTraining(true);
+    setTensorTrainProgress(0);
+
+    const logMsg = "Calibrating Chebyshev phase-space fields. Commencing multilinear coordinate descent tensor optimization.";
+    if (isTTSEnabled) {
+      playSpeech(logMsg);
+    }
+    pushJarvisLog('jarvis', logMsg);
+
+    addToast(
+      "MULTILINEAR TENSOR SOLVER",
+      "Coordinate descent initialized. Resolving higher-order Chebyshev interaction weights...",
+      "info"
+    );
+
+    const L = 1 + 4 * chebyshevOrder;
+    const map = getIndexMapping(L);
+    const N_param = map.length;
+
+    // Create the feature-target pairs
+    const samples = dataset.map(item => {
+      const v = constructFeatureVector(item, chebyshevOrder);
+      const X_pair: number[] = [];
+      map.forEach(({ i, j }) => {
+        X_pair.push(v[i] * v[j]);
+      });
+      return {
+        num: item.num,
+        X: X_pair,
+        Y: item.target
+      };
+    });
+
+    const shuffled = [...samples].sort(() => Math.random() - 0.5);
+    const splitIndex = Math.floor((splitRatio / 100) * samples.length);
+    const trainSet = shuffled.slice(0, splitIndex);
+    const testSet = shuffled.slice(splitIndex);
+
+    let w = Array(N_param).fill(0).map(() => Math.random() * 0.1 - 0.05);
+    let b = Math.random() * 0.1 - 0.05;
+
+    const computeMSE = (subset: typeof trainSet, currentW: number[], currentB: number): number => {
+      let sumErr = 0;
+      subset.forEach(s => {
+        let yHat = currentB;
+        for (let k = 0; k < N_param; k++) {
+          yHat += currentW[k] * s.X[k];
+        }
+        sumErr += Math.pow(yHat - s.Y, 2);
+      });
+      return sumErr / (2 * subset.length || 1);
+    };
+
+    const history: LossHistoryPoint[] = [];
+    const stepSize = Math.max(1, Math.floor(tensorEpochs / 35));
+
+    let epoch = 0;
+    const interval = setInterval(() => {
+      for (let s = 0; s < stepSize && epoch < tensorEpochs; epoch++) {
+        // Optimize coordinates (one feature pair weight at a time)
+        for (let k = 0; k < N_param; k++) {
+          let rho = 0;
+          let sumSqX = 0;
+
+          trainSet.forEach(sample => {
+            let yHatExcl = b;
+            for (let j_feat = 0; j_feat < N_param; j_feat++) {
+              if (j_feat !== k) {
+                yHatExcl += w[j_feat] * sample.X[j_feat];
+              }
+            }
+            const errExcl = sample.Y - yHatExcl;
+            rho += errExcl * sample.X[k];
+            sumSqX += sample.X[k] * sample.X[k];
+          });
+
+          // Normalize regularization
+          const M_samples = trainSet.length;
+          const l1 = l1Penalty * M_samples * elasticNetAlpha;
+          const l2 = l2Penalty * M_samples * (1 - elasticNetAlpha);
+
+          // Soft Thresholding
+          let softRho = 0;
+          if (rho > l1) softRho = rho - l1;
+          else if (rho < -l1) softRho = rho + l1;
+
+          w[k] = softRho / (sumSqX + l2 || 1);
+        }
+
+        // Optimize Intercept (bias b)
+        let sumErr = 0;
+        trainSet.forEach(sample => {
+          let yHat = 0;
+          for (let k = 0; k < N_param; k++) {
+            yHat += w[k] * sample.X[k];
+          }
+          sumErr += (sample.Y - yHat);
+        });
+        b = sumErr / trainSet.length;
+
+        if (epoch % Math.max(1, Math.floor(tensorEpochs / 25)) === 0) {
+          const trainLoss = computeMSE(trainSet, w, b);
+          const testLoss = computeMSE(testSet, w, b);
+          history.push({ epoch, trainLoss, testLoss });
+        }
+        s++;
+      }
+
+      const progressRaw = Math.min(100, Math.round((epoch / tensorEpochs) * 100));
+      setTensorTrainProgress(progressRaw);
+      setTensorWeights1D([...w]);
+      setTensorBias(b);
+      setTensorLossHistory([...history]);
+
+      if (epoch >= tensorEpochs) {
+        clearInterval(interval);
+        setIsTensorTraining(false);
+        setTensorModelTrained(true);
+
+        const finalTrainL = computeMSE(trainSet, w, b);
+        const finalTestL = computeMSE(testSet, w, b);
+
+        const successMsg = "Tensor network convergence achieved. Interactive weights locked.";
+        if (isTTSEnabled) {
+          playSpeech(successMsg);
+        }
+        pushJarvisLog('jarvis', `Tensor model optimization complete! Train MSE: ${finalTrainL.toFixed(4)}, Test MSE: ${finalTestL.toFixed(4)}. Total params calibrated: ${N_param}. Chebyshev Degree: ${chebyshevOrder}`);
+
+        addToast(
+          "TENSOR CALIBRATION SUCCESS",
+          `Elastic Net multilinear optimization reached convergence. Train MSE: ${finalTrainL.toFixed(4)}, Test MSE: ${finalTestL.toFixed(4)}.`,
           "success"
         );
       }
@@ -761,6 +1102,159 @@ export default function MultivariateMLPredictor({
     return () => cancelAnimationFrame(animId);
   }, [topTransitions, probeSelectedNum, activeTab]);
 
+  // Quantum SVD / Chebyshev state-space Visualizer
+  const canvasQuantumRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (activeTab !== 'quantum_tensor') return;
+    const canvas = canvasQuantumRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animId: number;
+    let phase = 0;
+
+    const render = () => {
+      phase += 0.01;
+      const width = canvas.width = canvas.offsetWidth;
+      const height = canvas.height = canvas.offsetHeight;
+      ctx.clearRect(0, 0, width, height);
+
+      const cx = width / 2;
+      const cy = height / 2;
+      const maxR = Math.min(width, height) * 0.42;
+
+      // Draw background spectral constellation web (SVD Eigenvector connections)
+      if (eigenvectors.length > 0 && singularValues.length > 0) {
+        // Draw connection lines for nodes with strong eigenvector correlation
+        ctx.strokeStyle = 'rgba(16, 185, 129, 0.04)';
+        ctx.lineWidth = 0.5;
+        const v0 = eigenvectors[0];
+        const v1 = eigenvectors[1] || v0;
+        
+        for (let i = 0; i < 49; i += 2) {
+          const thetaI = (i * Math.PI * 2) / 49 + phase * 0.08;
+          const ri = maxR * (0.4 + 0.5 * Math.abs(v0[i] || 0.1));
+          const xi = cx + Math.cos(thetaI) * ri;
+          const yi = cy + Math.sin(thetaI) * ri;
+
+          for (let j = i + 1; j < 49; j += 3) {
+            // Correlation strength
+            const correlation = Math.abs(v0[i] * v0[j] + v1[i] * v1[j]);
+            if (correlation > 0.005) {
+              const thetaJ = (j * Math.PI * 2) / 49 + phase * 0.08;
+              const rj = maxR * (0.4 + 0.5 * Math.abs(v0[j] || 0.1));
+              const xj = cx + Math.cos(thetaJ) * rj;
+              const yj = cy + Math.sin(thetaJ) * rj;
+
+              ctx.beginPath();
+              ctx.moveTo(xi, yi);
+              ctx.lineTo(xj, yj);
+              ctx.strokeStyle = `rgba(16, 185, 129, ${Math.min(0.2, correlation * 12)})`;
+              ctx.lineWidth = 0.5 + correlation * 4;
+              ctx.stroke();
+            }
+          }
+        }
+      }
+
+      // Draw concentric orbital shells (Chebyshev nodes)
+      ctx.strokeStyle = 'rgba(168, 85, 247, 0.05)';
+      ctx.lineWidth = 1;
+      for (let s = 1; s <= chebyshevOrder; s++) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, maxR * (s / chebyshevOrder), 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Draw active probe selection particle ripples
+      const probeIndex = probeSelectedNum - 1;
+      const thetaProbe = (probeIndex * Math.PI * 2) / 49 + phase * 0.08;
+      const v0_p = eigenvectors[0] ? eigenvectors[0][probeIndex] : 0.1;
+      const rProbe = maxR * (0.4 + 0.5 * Math.abs(v0_p));
+      const xp = cx + Math.cos(thetaProbe) * rProbe;
+      const yp = cy + Math.sin(thetaProbe) * rProbe;
+
+      // Pulse ripple
+      const rippleRadius = 15 + Math.abs(Math.sin(phase * 4)) * 12;
+      ctx.beginPath();
+      ctx.arc(xp, yp, rippleRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(236, 72, 153, 0.25)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Render all 49 lottery numbers as quantum states loaded by SVD density
+      for (let i = 0; i < 49; i++) {
+        const num = i + 1;
+        const theta = (i * Math.PI * 2) / 49 + phase * 0.08;
+        
+        // Scale distance from center based on first eigenvector component loading
+        const eigVal0 = eigenvectors[0] ? eigenvectors[0][i] : Math.sin(i * 0.2);
+        const r = maxR * (0.4 + 0.5 * Math.abs(eigVal0));
+        
+        const x = cx + Math.cos(theta) * r;
+        const y = cy + Math.sin(theta) * r;
+
+        // Size scaled by SVD potential value
+        const sPot = svdPotential[i] || 0.15;
+        const nodeSize = 4 + sPot * 8;
+
+        // Draw node dot
+        ctx.beginPath();
+        ctx.arc(x, y, nodeSize, 0, Math.PI * 2);
+
+        // Highlight selected node
+        if (num === probeSelectedNum) {
+          ctx.fillStyle = '#ec4899'; // Tesla Pink
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = '#ec4899';
+        } else if (activeProposedNumbers.includes(num)) {
+          ctx.fillStyle = '#10b981'; // SVD Emerald
+          ctx.shadowBlur = 6;
+          ctx.shadowColor = '#10b981';
+        } else {
+          ctx.fillStyle = `rgba(168, 85, 247, ${0.4 + sPot * 0.6})`; // Chebyshev Purple
+          ctx.shadowBlur = 0;
+        }
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Draw outer ring around high density nodes
+        if (sPot > 0.7) {
+          ctx.beginPath();
+          ctx.arc(x, y, nodeSize + 3, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(16, 185, 129, 0.3)';
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
+
+        // Draw index text for high-value nodes or if probed
+        if (num === probeSelectedNum || sPot > 0.8 || num % 5 === 0) {
+          ctx.fillStyle = num === probeSelectedNum ? '#ffffff' : '#94a3b8';
+          ctx.font = num === probeSelectedNum ? 'bold 8px monospace' : '7px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`${num}`, x, y);
+        }
+      }
+
+      // Center singularity
+      ctx.beginPath();
+      ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#111827';
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 1.5;
+      ctx.fill();
+      ctx.stroke();
+
+      animId = requestAnimationFrame(render);
+    };
+
+    render();
+    return () => cancelAnimationFrame(animId);
+  }, [eigenvectors, singularValues, svdPotential, chebyshevOrder, probeSelectedNum, activeTab, activeProposedNumbers]);
+
   // Chat/dialog helper
   const pushJarvisLog = (sender: 'jarvis' | 'user', text: string) => {
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -901,6 +1395,17 @@ export default function MultivariateMLPredictor({
             <Network className="w-3 h-3" />
             <span>Markov Paths</span>
           </button>
+          <button
+            onClick={() => setActiveTab('quantum_tensor')}
+            className={`px-3 py-1 text-[8.5px] font-mono rounded uppercase font-black tracking-widest transition flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'quantum_tensor' 
+                ? 'bg-emerald-900/40 border border-emerald-500/30 text-emerald-300' 
+                : 'text-slate-500 hover:text-slate-350 bg-transparent border border-transparent'
+            }`}
+          >
+            <Zap className="w-3 h-3" />
+            <span>Quantum Tensor</span>
+          </button>
         </div>
       </header>
 
@@ -911,7 +1416,7 @@ export default function MultivariateMLPredictor({
         <div className="lg:col-span-4 bg-slate-950 border border-slate-900 rounded-xl p-4 flex flex-col justify-between min-h-[350px] relative shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
           <div className="flex justify-between items-center pb-2 border-b border-slate-900/60 font-mono select-none text-[8.5px] text-slate-500">
             <span>MULTIMETER SCANNER MODULE</span>
-            <span className={`${activeTab === 'regression' ? 'text-purple-400' : 'text-cyan-400'} animate-pulse`}>
+            <span className={`${activeTab === 'regression' ? 'text-purple-400' : activeTab === 'markov' ? 'text-cyan-400' : 'text-emerald-400'} animate-pulse`}>
               {`NODE #${probeSelectedNum} SCAN`}
             </span>
           </div>
@@ -1011,7 +1516,7 @@ export default function MultivariateMLPredictor({
           </div>
         </div>
 
-        {/* Column 2: Regression Controls OR Markov Transitions Info */}
+        {/* Column 2: Regression Controls OR Markov Transitions Info OR Quantum Tensor controls */}
         <div className="lg:col-span-5 bg-slate-950 border border-slate-900 rounded-xl p-4 flex flex-col justify-between min-h-[350px] shadow-[inset_0_0_20px_rgba(0,0,0,0.3)]">
           <AnimatePresence mode="wait">
             {activeTab === 'regression' ? (
@@ -1130,7 +1635,7 @@ export default function MultivariateMLPredictor({
                   </div>
                 </div>
               </motion.div>
-            ) : (
+            ) : activeTab === 'markov' ? (
               <motion.div 
                 key="markov-view"
                 initial={{ opacity: 0, x: 10 }}
@@ -1172,6 +1677,141 @@ export default function MultivariateMLPredictor({
                   <p className="text-[7.5px] font-mono text-slate-600 uppercase leading-relaxed mt-2 p-2.5 bg-black/40 border border-slate-900/60 rounded">
                     <strong className="text-cyan-400">COMPLEX CASCADE ENTROPY:</strong> These weights reflect the historical transition rates. If node {probeSelectedNum} occurs in a draw, the numbers above represent the highest probability candidates for the next consecutive sequence.
                   </p>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="quantum-tensor-view"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.25 }}
+                className="flex flex-col justify-between h-full w-full"
+              >
+                <div className="flex justify-between items-center pb-2 border-b border-slate-900/60 font-mono select-none text-[8.5px] text-slate-500">
+                  <span>QUANTUM TENSOR CO-OCCURRENCE SPECTRAL MATRIX</span>
+                  <span className="text-emerald-400 font-extrabold uppercase animate-pulse">
+                    {isTensorTraining ? "RESOLVING TENSOR..." : "LOCK COHERENT"}
+                  </span>
+                </div>
+
+                {/* SVD singular values spectrum visualization bar chart */}
+                <div className="flex-1 h-[135px] min-h-[135px] flex items-center justify-center relative mt-3 mb-2">
+                  {tensorLossHistory.length === 0 ? (
+                    <div className="w-full h-full flex flex-col justify-between p-1">
+                      <div className="flex justify-between text-[7px] text-slate-500 font-mono select-none uppercase">
+                        <span>SVD Singular Values Spectrum:</span>
+                        <span>Rank {tensorRank} loading</span>
+                      </div>
+                      <div className="flex items-end justify-around gap-1.5 h-[95px] px-2 bg-black/40 border border-slate-900/40 rounded py-2">
+                        {singularValues.map((val, idx) => (
+                          <div key={idx} className="flex-1 flex flex-col items-center gap-1">
+                            <span className="text-[6.5px] font-mono text-emerald-400">{(val * 10).toFixed(1)}</span>
+                            <div 
+                              className="w-full bg-gradient-to-t from-emerald-950 to-emerald-500 rounded-t transition-all duration-500 border-t border-emerald-400/30" 
+                              style={{ height: `${Math.min(75, Math.max(10, val * 45)) || 10}px` }}
+                            />
+                            <span className="text-[6.5px] font-mono text-slate-600">λ_{idx+1}</span>
+                          </div>
+                        ))}
+                        {singularValues.length === 0 && (
+                          <span className="text-[7.5px] font-mono text-slate-600 uppercase tracking-widest text-center py-8">
+                            COVARIANCE EIGEN-DECOMPOSITION PENDING
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-full h-full text-[8.5px] font-mono text-slate-400">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={tensorLossHistory} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#111827" />
+                          <XAxis dataKey="epoch" tick={{ fill: '#4b5563', fontSize: 7 }} />
+                          <YAxis tick={{ fill: '#4b5563', fontSize: 7 }} />
+                          <Tooltip 
+                            contentStyle={{ backgroundColor: '#090d16', border: '1px solid #1e293b', borderRadius: '4px', fontSize: '8px' }}
+                            labelStyle={{ color: '#10b981' }}
+                          />
+                          <Legend iconSize={6} wrapperStyle={{ fontSize: '7px' }} />
+                          <Line type="monotone" dataKey="trainLoss" name="Tensor Train" stroke="#10b981" strokeWidth={1.5} dot={false} />
+                          <Line type="monotone" dataKey="testLoss" name="Tensor Test" stroke="#a855f7" strokeWidth={1.5} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </div>
+
+                {/* Tensor & SVD sliders */}
+                <div className="flex flex-col gap-2 bg-black/40 p-2.5 rounded-lg border border-slate-900 select-none font-mono text-[7px]">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex justify-between text-slate-400">
+                        <span>CHEBYSHEV DEGREE (D):</span>
+                        <span className="text-emerald-400">{chebyshevOrder}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="4"
+                        step="1"
+                        value={chebyshevOrder}
+                        onChange={(e) => setChebyshevOrder(parseInt(e.target.value))}
+                        disabled={isTensorTraining}
+                        className="w-full h-1 bg-slate-800 rounded outline-none accent-emerald-500 cursor-pointer disabled:opacity-40"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex justify-between text-slate-400">
+                        <span>SVD TENSOR RANK:</span>
+                        <span className="text-emerald-400">{tensorRank}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="2"
+                        max="8"
+                        step="1"
+                        value={tensorRank}
+                        onChange={(e) => setTensorRank(parseInt(e.target.value))}
+                        disabled={isTensorTraining}
+                        className="w-full h-1 bg-slate-800 rounded outline-none accent-emerald-500 cursor-pointer disabled:opacity-40"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex justify-between text-slate-400">
+                        <span>ELASTIC ALPHA (α):</span>
+                        <span className="text-emerald-400">{elasticNetAlpha.toFixed(2)}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.1"
+                        value={elasticNetAlpha}
+                        onChange={(e) => setElasticNetAlpha(parseFloat(e.target.value))}
+                        disabled={isTensorTraining}
+                        className="w-full h-1 bg-slate-800 rounded outline-none accent-emerald-500 cursor-pointer disabled:opacity-40"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex justify-between text-slate-400">
+                        <span>TENSOR EPOCHS:</span>
+                        <span className="text-emerald-400">{tensorEpochs}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="200"
+                        max="1500"
+                        step="100"
+                        value={tensorEpochs}
+                        onChange={(e) => setTensorEpochs(parseInt(e.target.value))}
+                        disabled={isTensorTraining}
+                        className="w-full h-1 bg-slate-800 rounded outline-none accent-emerald-500 cursor-pointer disabled:opacity-40"
+                      />
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -1251,14 +1891,25 @@ export default function MultivariateMLPredictor({
           </div>
 
           {/* Trigger training loop button */}
-          <button
-            onClick={runGradientDescentTraining}
-            disabled={isTraining}
-            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-950 to-cyan-950 hover:from-purple-900 hover:to-cyan-900 border border-purple-500/30 text-[10px] font-mono text-purple-300 font-black tracking-widest uppercase transition-all duration-300 cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(168,85,247,0.1)] active:scale-98"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 text-purple-400 ${isTraining ? 'animate-spin' : ''}`} />
-            <span>{isTraining ? `CALCULATING EPOCHS: ${trainProgress}%` : "BOOT NEURAL OPTIMIZER"}</span>
-          </button>
+          {activeTab === 'quantum_tensor' ? (
+            <button
+              onClick={runTensorTraining}
+              disabled={isTensorTraining}
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-950 to-purple-950 hover:from-emerald-900 hover:to-purple-900 border border-emerald-500/30 text-[10px] font-mono text-emerald-300 font-black tracking-widest uppercase transition-all duration-300 cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.1)] active:scale-98"
+            >
+              <Zap className={`w-3.5 h-3.5 text-emerald-400 ${isTensorTraining ? 'animate-pulse' : ''}`} />
+              <span>{isTensorTraining ? `SOLVING TENSOR: ${tensorTrainProgress}%` : "BOOT TENSOR RESOLVER"}</span>
+            </button>
+          ) : (
+            <button
+              onClick={runGradientDescentTraining}
+              disabled={isTraining}
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-950 to-cyan-950 hover:from-purple-900 hover:to-cyan-900 border border-purple-500/30 text-[10px] font-mono text-purple-300 font-black tracking-widest uppercase transition-all duration-300 cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(168,85,247,0.1)] active:scale-98"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-purple-400 ${isTraining ? 'animate-spin' : ''}`} />
+              <span>{isTraining ? `CALCULATING EPOCHS: ${trainProgress}%` : "BOOT NEURAL OPTIMIZER"}</span>
+            </button>
+          )}
           
         </div>
 
@@ -1272,14 +1923,18 @@ export default function MultivariateMLPredictor({
              <span>
                {activeTab === 'regression' 
                  ? '3D MULTIPLE LINEAR REGRESSION HYPERPLANE' 
-                 : `2D MARKOV STATE TRANSITION FLOW PATHWAY`
+                 : activeTab === 'markov'
+                   ? '2D MARKOV STATE TRANSITION FLOW PATHWAY'
+                   : 'QUANTUM SPECTRAL DECOMPOSITION (SVD & CHEBYSHEV)'
                }
              </span>
            </div>
            <span>
              {activeTab === 'regression' 
                ? '[X: FREQ, Z: RECENCY GAP] -> RESIDUAL Y' 
-               : `FLOW CURRENTS FOR ACTIVE HORIZON NODE #${probeSelectedNum}`
+               : activeTab === 'markov'
+                 ? `FLOW CURRENTS FOR ACTIVE HORIZON NODE #${probeSelectedNum}`
+                 : `49-STATE PROBABILITY DENSITY AND CONSTELLATION WEB`
              }
            </span>
         </div>
@@ -1301,7 +1956,7 @@ export default function MultivariateMLPredictor({
                    <span>b Intercept: {bias.toFixed(3)}</span>
                  </div>
                </motion.div>
-             ) : (
+             ) : activeTab === 'markov' ? (
                <motion.div 
                  key="canvas-markov"
                  initial={{ opacity: 0 }}
@@ -1313,6 +1968,20 @@ export default function MultivariateMLPredictor({
                  <div className="absolute top-2 right-2 flex flex-col gap-1 items-end pointer-events-none font-mono text-[7px] text-slate-500 uppercase">
                    <span>State transition probability weights</span>
                    <span>Active core origin: node #{probeSelectedNum}</span>
+                 </div>
+               </motion.div>
+             ) : (
+               <motion.div 
+                 key="canvas-quantum"
+                 initial={{ opacity: 0 }}
+                 animate={{ opacity: 1 }}
+                 exit={{ opacity: 0 }}
+                 className="w-full h-full relative"
+               >
+                 <canvas ref={canvasQuantumRef} className="w-full h-full block" />
+                 <div className="absolute top-2 right-2 flex flex-col gap-1 items-end pointer-events-none font-mono text-[7px] text-slate-500 uppercase">
+                   <span>SVD Singularity Density Map</span>
+                   <span>Orthogonal Chebyshev Degree: {chebyshevOrder}</span>
                  </div>
                </motion.div>
              )}
