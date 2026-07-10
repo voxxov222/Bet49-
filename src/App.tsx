@@ -22,6 +22,7 @@ import QuantumStringTabSpace from './components/QuantumStringTabSpace';
 import QuantumVirtualMachine from './components/QuantumVirtualMachine';
 import QuantumSuperpositionVisualizer from './components/QuantumSuperpositionVisualizer';
 import QuantumPredictionEngine from './components/QuantumPredictionEngine';
+import QuantumTetrahedronSandbox from './components/QuantumTetrahedronSandbox';
 import QuantumQubitTerminal from './components/QuantumQubitTerminal';
 import FloatingAgentJarvis from './components/FloatingAgentJarvis';
 import Markdown from 'react-markdown';
@@ -7924,6 +7925,7 @@ We have a confident cross-reference match with our database!
               setParticles={setParticles}
             />
             <QuantumPredictionEngine particles={particles} />
+            <QuantumTetrahedronSandbox />
           </section>
         )}
 
