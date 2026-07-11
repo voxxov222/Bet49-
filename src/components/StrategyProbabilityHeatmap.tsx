@@ -64,7 +64,7 @@ export default function StrategyProbabilityHeatmap({
 
     const maxCount = Math.max(...Object.values(counts), 1);
     const lastDraw = [...draws].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-    const lastNumbers = lastDraw ? lastDraw.numbers : [];
+    const lastNumbers = (lastDraw && Array.isArray(lastDraw.numbers)) ? lastDraw.numbers : [];
 
     const scores: Record<number, {
       probability: number;

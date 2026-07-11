@@ -520,7 +520,7 @@ export default function OmniQuantum3DSpace({
           nodeTextColor = 'rgba(255, 255, 255, 1)';
           ctx.shadowColor = 'rgba(6, 182, 212, 0.9)';
           ctx.shadowBlur = radius * 1.5;
-        } else if (draws[0]?.numbers.includes(node.num)) {
+        } else if (draws[0]?.numbers?.includes(node.num)) {
           // Highlight last drawing outcome
           nodeFill = 'rgba(236, 72, 153, 0.85)';
           nodeStroke = 'rgba(244, 63, 94, 1)';

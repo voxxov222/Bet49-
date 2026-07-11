@@ -1,0 +1,67 @@
+{
+  "entities": {
+    "profile": {
+      "title": "UserProfile",
+      "description": "User account settings and system personalization",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique user ID from Firebase Auth" },
+        "displayName": { "type": "string", "maxLength": 50, "description": "User's display nickname" },
+        "avatarUrl": { "type": "string", "description": "Avatar preset key or custom image URL" },
+        "role": { "type": "string", "enum": ["user", "moderator", "admin"], "description": "User privilege tier" },
+        "bio": { "type": "string", "maxLength": 200, "description": "User bio profile description" },
+        "quantumRank": { "type": "string", "description": "Dynamic ranking title based on activity" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the profile was created" }
+      },
+      "required": ["uid", "displayName", "role"]
+    },
+    "forum_post": {
+      "title": "ForumPost",
+      "description": "Blog and forum posts containing text, image links, video links, or categories",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 3, "maxLength": 100, "description": "Post title" },
+        "content": { "type": "string", "minLength": 5, "maxLength": 5000, "description": "Main post description" },
+        "category": { "type": "string", "description": "Thread categories (e.g., General, Strategy, Success, Tech)" },
+        "imageUrl": { "type": "string", "description": "Optional image asset attachment URL" },
+        "videoUrl": { "type": "string", "description": "Optional video attachment URL (e.g. YouTube/Vimeo embed or direct)" },
+        "authorId": { "type": "string", "description": "User ID of the thread author" },
+        "authorName": { "type": "string", "description": "Cached display name of the author" },
+        "authorAvatar": { "type": "string", "description": "Cached avatar code/url of the author" },
+        "likesCount": { "type": "number", "description": "Total number of likes/upvotes" },
+        "likedBy": { "type": "array", "description": "List of user IDs who liked this post" },
+        "repliesCount": { "type": "number", "description": "Total number of replies or comments" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["title", "content", "category", "authorId", "authorName", "createdAt"]
+    },
+    "comment": {
+      "title": "Comment",
+      "description": "User replies to a specific forum or blog post",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string", "description": "The ID of the parent post" },
+        "content": { "type": "string", "minLength": 1, "maxLength": 1000, "description": "Reply content text" },
+        "authorId": { "type": "string", "description": "User ID of the commenter" },
+        "authorName": { "type": "string", "description": "Cached display name of the commenter" },
+        "authorAvatar": { "type": "string", "description": "Cached avatar code/url of the commenter" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["postId", "content", "authorId", "authorName", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/profiles/{uid}": {
+      "schema": "profile",
+      "description": "User profile document keyed by auth UID"
+    },
+    "/forum_posts/{postId}": {
+      "schema": "forum_post",
+      "description": "Blog and forum threads"
+    },
+    "/forum_posts/{postId}/comments/{commentId}": {
+      "schema": "comment",
+      "description": "Comments attached to a specific blog/forum thread"
+    }
+  }
+}

@@ -222,7 +222,7 @@ export default function HexagonalPrimeSpiral({
     hexNodes.forEach(node => {
       // Apply filters
       const isVortex = [1, 2, 4, 8, 7, 5].includes((node.num % 9) === 0 ? 9 : (node.num % 9));
-      const isConsensusOverlap = draws[0]?.numbers.includes(node.num);
+      const isConsensusOverlap = draws[0]?.numbers?.includes(node.num) ?? false;
 
       if (harmonicFilter === 'primes' && !node.isPrime) return;
       if (harmonicFilter === 'vortex' && (!isVortex || node.num > 49)) return;
@@ -422,7 +422,7 @@ export default function HexagonalPrimeSpiral({
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">CONSENSUS OVERLAPS (LAST DRAW):</span>
-                <span className="text-cyan-450 font-black">{draws[0]?.numbers.filter(n => isPrime(n)).length} PRIMES</span>
+                <span className="text-cyan-450 font-black">{(draws[0]?.numbers || []).filter(n => isPrime(n)).length} PRIMES</span>
               </div>
             </div>
           </div>

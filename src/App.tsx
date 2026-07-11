@@ -26,6 +26,9 @@ import QuantumSuperpositionVisualizer from './components/QuantumSuperpositionVis
 import Hyper4DWaveCollapser from './components/Hyper4DWaveCollapser';
 import ThreeDQuantumSandbox from './components/ThreeDQuantumSandbox';
 import ConsciousAgentResearcher from './components/ConsciousAgentResearcher';
+import PremiumSubscriptionManager, { PremiumLock } from './components/PremiumSubscriptionManager';
+import UserProfileModal from './components/UserProfileModal';
+import BlogForumSection from './components/BlogForumSection';
 import QuantumPredictionEngine from './components/QuantumPredictionEngine';
 import QuantumTetrahedronSandbox from './components/QuantumTetrahedronSandbox';
 import QuantumQubitTerminal from './components/QuantumQubitTerminal';
@@ -221,7 +224,37 @@ export default function App() {
   });
 
   // Advanced Visual UX / Toast & Calculating States
-  const [activeCategory, setActiveCategory] = useState<'engines' | 'analytics' | 'summary' | 'data' | 'jarvis' | 'simple' | 'swarms' | 'string3d' | 'qvm' | 'dashy' | 'dashy_view' | 'winnings' | 'hyper4d' | 'agent_research'>('engines');
+  const [isPremium, setIsPremium] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<'engines' | 'analytics' | 'summary' | 'data' | 'jarvis' | 'simple' | 'swarms' | 'string3d' | 'qvm' | 'dashy' | 'dashy_view' | 'winnings' | 'hyper4d' | 'agent_research' | 'blog_forum'>('engines');
+  const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+
+  // Monitor active user profile from global window or localStorage
+  useEffect(() => {
+    const syncProfile = () => {
+      if ((window as any).currentUserProfile) {
+        setCurrentUserProfile((window as any).currentUserProfile);
+      } else {
+        const savedGuest = localStorage.getItem('quantum_guest_profile');
+        if (savedGuest) {
+          try {
+            setCurrentUserProfile(JSON.parse(savedGuest));
+          } catch (e) {
+            setCurrentUserProfile(null);
+          }
+        } else {
+          setCurrentUserProfile(null);
+        }
+      }
+    };
+
+    // Run immediately
+    syncProfile();
+
+    // Check periodically for changes
+    const timer = setInterval(syncProfile, 1000);
+    return () => clearInterval(timer);
+  }, []);
   const [hyper4dSubTab, setHyper4dSubTab] = useState<'collapser' | 'sandbox'>('collapser');
   const [toasts, setToasts] = useState<{ id: string; type: 'success' | 'info' | 'error' | 'warning'; title: string; message: string }[]>([]);
   const [isCalculating, setIsCalculating] = useState(false);
@@ -406,6 +439,10 @@ export default function App() {
   // Command control mainframe target simulation
   const triggerManualCalculation = () => {
     if (isCalculating) return;
+    if (typeof (window as any).verifyAndConsumeQuantumRun === 'function') {
+      const allowed = (window as any).verifyAndConsumeQuantumRun();
+      if (!allowed) return;
+    }
     setIsCalculating(true);
     addToast('QUANTUM ANALYSIS ENGAGED', 'Syncing 49-node E8 lattice vectors...', 'info');
     if (isTTSEnabled) {
@@ -4147,6 +4184,44 @@ We have a confident cross-reference match with our database!
 
         {/* Action Controls */}
         <div className="flex items-center gap-4">
+          {/* USER PROFILE ACTION TRIGGER */}
+          <button
+            onClick={() => setShowProfileModal(true)}
+            className="flex items-center gap-2 bg-slate-900 border border-slate-850 hover:border-cyan-500/50 hover:bg-slate-850 px-2.5 py-1.5 rounded-xl transition duration-200 shrink-0"
+            title="User Profile & Sync Settings"
+          >
+            {currentUserProfile ? (
+              <>
+                <div 
+                  className="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] uppercase font-mono shadow-[0_0_8px_rgba(6,182,212,0.3)] shrink-0 border"
+                  style={{ 
+                    backgroundColor: currentUserProfile.avatarColor ? `${currentUserProfile.avatarColor}22` : '#083344',
+                    borderColor: currentUserProfile.avatarColor || '#06b6d4',
+                    color: currentUserProfile.avatarColor || '#06b6d4'
+                  }}
+                >
+                  {currentUserProfile.displayName ? currentUserProfile.displayName[0] : 'U'}
+                </div>
+                <div className="hidden md:flex flex-col items-start leading-none pr-1">
+                  <span className="text-[9px] font-bold text-white uppercase tracking-wider truncate max-w-[75px]">
+                    {currentUserProfile.displayName || 'GUEST USER'}
+                  </span>
+                  <span className="text-[7px] font-mono text-cyan-400 uppercase tracking-widest mt-0.5">
+                    {currentUserProfile.isAnonymous ? 'GUEST' : 'CONNECTED'}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-5 h-5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 font-bold text-[9px]">
+                  ?
+                </div>
+                <span className="text-[10px] font-mono text-slate-400 font-bold uppercase tracking-wider hidden sm:inline">
+                  CONNECT
+                </span>
+              </>
+            )}
+          </button>
           <button 
             onClick={() => setIsLightTheme(!isLightTheme)}
             className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-900 border border-slate-700 hover:border-cyan-500/50 hover:bg-slate-800 transition-colors shadow-sm focus:outline-none"
@@ -4226,6 +4301,7 @@ We have a confident cross-reference match with our database!
             { id: 'jarvis', label: 'J.A.R.V.I.S. HUB' },
             { id: 'agent_research', label: '🧠 CONSCIOUS AGENT' },
             { id: 'winnings', label: '🏆 WINNINGS & SUCCESS' },
+            { id: 'blog_forum', label: '💬 COMMUNITY & BLOG' },
             { id: 'dashy_view', label: '📊 BET DASHBOARD' },
             { id: 'dashy', label: '🎛️ DASHBOARD BUILDER' }
           ].map(cat => (
@@ -4250,14 +4326,16 @@ We have a confident cross-reference match with our database!
 
         {/* 🧠 CONSCIOUS AGENT RESEARCHER */}
         {activeCategory === 'agent_research' && (
-          <ConsciousAgentResearcher
-            draws={draws}
-            addToast={addToast}
-            onApplyNumbers={(nums) => {
-              setProposedNumbers(nums);
-            }}
-            playSpeech={playSpeech}
-          />
+          <PremiumLock isPremium={isPremium} onUnlock={() => (window as any).triggerUpgradeModal?.()}>
+            <ConsciousAgentResearcher
+              draws={draws}
+              addToast={addToast}
+              onApplyNumbers={(nums) => {
+                setProposedNumbers(nums);
+              }}
+              playSpeech={playSpeech}
+            />
+          </PremiumLock>
         )}
 
         {/* 🏆 WINNINGS & SUCCESS RATE DASHBOARD */}
@@ -4276,6 +4354,16 @@ We have a confident cross-reference match with our database!
           />
         )}
 
+        {/* 💬 BLOG & FORUM COMMUNITY SECTION */}
+        {activeCategory === 'blog_forum' && (
+          <BlogForumSection
+            currentUserProfile={currentUserProfile}
+            addToast={addToast}
+            playSpeech={playSpeech}
+            triggerUpgradeModal={() => (window as any).triggerUpgradeModal?.()}
+          />
+        )}
+
         {/* 📊 BET DASHBOARD CANVAS EDITOR */}
         {activeCategory === 'dashy_view' && (
           <div className="w-full flex flex-col gap-4">
@@ -4286,7 +4374,7 @@ We have a confident cross-reference match with our database!
                   Custom Bet Dashboard
                 </span>
                 <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-400 font-mono">
-                  {dashyConfig.sections[0]?.widgets.length || 0} Widgets Active
+                  {(dashyConfig.sections[0]?.widgets || []).length || 0} Widgets Active
                 </span>
               </div>
               <div className="flex items-center gap-2 mt-3 sm:mt-0">
@@ -4299,7 +4387,7 @@ We have a confident cross-reference match with our database!
               </div>
             </div>
 
-            {dashyConfig.sections[0]?.widgets.length === 0 && (
+            {(dashyConfig.sections[0]?.widgets || []).length === 0 && (
               <div className="w-full h-64 border-2 border-dashed border-slate-800 rounded-2xl flex flex-col items-center justify-center bg-slate-900/20 backdrop-blur-sm gap-4 mt-8">
                 <div className="w-16 h-16 rounded-full bg-slate-900 flex items-center justify-center border border-slate-800">
                   <Plus className="w-8 h-8 text-slate-500" />
@@ -5275,7 +5363,7 @@ We have a confident cross-reference match with our database!
               {selectedStrategy === '369-offset' && (
                 <div className="w-full flex flex-col gap-4">
                   <div className="grid grid-cols-6 gap-3">
-                    {draws[0]?.numbers.map((baseNum, idx) => {
+                    {(draws[0]?.numbers || []).map((baseNum, idx) => {
                       const offsetValue = offsets369[idx] || 3;
                       const activeResult = proposedNumbers[idx];
 
@@ -7961,87 +8049,8 @@ We have a confident cross-reference match with our database!
         {/* 🌌 STRING WIREFRAME 3D SECTION */}
         {isWidgetVisible('string3d') && (
           <section className="flex flex-col gap-5 w-full" style={{ order: getWidgetOrder('string3d') }}>
-            <QuantumStringTabSpace 
-              draws={draws}
-              activeProposedNumbers={proposedNumbers}
-              onApplyNumbers={(nums) => setProposedNumbers(nums)}
-              playSpeech={playSpeech}
-              isTTSEnabled={isTTSEnabled}
-              addToast={(title, message, type) => addToast(title, message, type as any)}
-            />
-          </section>
-        )}
-
-        {/* ⚛️ QUANTUM VIRTUAL MACHINE */}
-        {isWidgetVisible('qvm') && (
-          <section className="flex flex-col gap-6 w-full" style={{ order: getWidgetOrder('qvm') }}>
-            <QuantumQubitTerminal 
-              onApplyNumbers={(nums, bonus) => {
-                setProposedNumbers(nums);
-                if (bonus !== undefined) {
-                  setProposedBonusNumber(bonus);
-                }
-              }}
-              addToast={(title, message, type) => addToast(title, message, type as any)}
-              playSpeech={playSpeech}
-            />
-            <QuantumVirtualMachine 
-              onApplyNumbers={(nums, bonus) => {
-                setProposedNumbers(nums);
-                if (bonus !== undefined) {
-                  setProposedBonusNumber(bonus);
-                }
-              }}
-              playSpeech={playSpeech}
-              isTTSEnabled={isTTSEnabled}
-              addToast={(title, message, type) => addToast(title, message, type as any)}
-            />
-            <QuantumSuperpositionVisualizer 
-              particles={particles}
-              setParticles={setParticles}
-            />
-            <QuantumPredictionEngine particles={particles} />
-            <QuantumTetrahedronSandbox />
-          </section>
-        )}
-
-        {/* 🌀 4D HYPER WAVE COLLAPSE SECTION */}
-        {isWidgetVisible('hyper4d') && (
-          <section className="flex flex-col gap-6 w-full" style={{ order: getWidgetOrder('hyper4d') }}>
-            
-            {/* Cyber Sub-navigation bar */}
-            <div className="flex items-center justify-between bg-slate-950/70 border border-slate-900 rounded-xl p-2.5 font-mono">
-              <div className="flex items-center gap-2 px-3">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-                <span className="text-[10px] text-slate-400 uppercase tracking-widest font-black">Dimension Mode Selector:</span>
-              </div>
-              <div className="flex gap-1.5">
-                <button
-                  onClick={() => setHyper4dSubTab('collapser')}
-                  className={`py-1.5 px-3.5 rounded-lg text-[10px] font-bold border transition ${
-                    hyper4dSubTab === 'collapser'
-                      ? 'bg-cyan-950 border-cyan-500/50 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
-                      : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700'
-                  }`}
-                >
-                  🌀 4D WAVE COLLAPSER
-                </button>
-                <button
-                  onClick={() => setHyper4dSubTab('sandbox')}
-                  className={`py-1.5 px-3.5 rounded-lg text-[10px] font-bold border transition ${
-                    hyper4dSubTab === 'sandbox'
-                      ? 'bg-purple-950 border-purple-500/50 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
-                      : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700'
-                  }`}
-                >
-                  🎮 IMMERSIVE 3D SANDBOX
-                </button>
-              </div>
-            </div>
-
-            {/* Sub-component viewport render */}
-            {hyper4dSubTab === 'collapser' ? (
-              <Hyper4DWaveCollapser 
+            <PremiumLock isPremium={isPremium} onUnlock={() => (window as any).triggerUpgradeModal?.()}>
+              <QuantumStringTabSpace 
                 draws={draws}
                 activeProposedNumbers={proposedNumbers}
                 onApplyNumbers={(nums) => setProposedNumbers(nums)}
@@ -8049,13 +8058,97 @@ We have a confident cross-reference match with our database!
                 isTTSEnabled={isTTSEnabled}
                 addToast={(title, message, type) => addToast(title, message, type as any)}
               />
-            ) : (
-              <ThreeDQuantumSandbox 
-                onApplyNumbers={(nums) => setProposedNumbers(nums)}
+            </PremiumLock>
+          </section>
+        )}
+
+        {/* ⚛️ QUANTUM VIRTUAL MACHINE */}
+        {isWidgetVisible('qvm') && (
+          <section className="flex flex-col gap-6 w-full" style={{ order: getWidgetOrder('qvm') }}>
+            <PremiumLock isPremium={isPremium} onUnlock={() => (window as any).triggerUpgradeModal?.()}>
+              <QuantumQubitTerminal 
+                onApplyNumbers={(nums, bonus) => {
+                  setProposedNumbers(nums);
+                  if (bonus !== undefined) {
+                    setProposedBonusNumber(bonus);
+                  }
+                }}
+                addToast={(title, message, type) => addToast(title, message, type as any)}
                 playSpeech={playSpeech}
+              />
+              <QuantumVirtualMachine 
+                onApplyNumbers={(nums, bonus) => {
+                  setProposedNumbers(nums);
+                  if (bonus !== undefined) {
+                    setProposedBonusNumber(bonus);
+                  }
+                }}
+                playSpeech={playSpeech}
+                isTTSEnabled={isTTSEnabled}
                 addToast={(title, message, type) => addToast(title, message, type as any)}
               />
-            )}
+              <QuantumSuperpositionVisualizer 
+                particles={particles}
+                setParticles={setParticles}
+              />
+              <QuantumPredictionEngine particles={particles} />
+              <QuantumTetrahedronSandbox />
+            </PremiumLock>
+          </section>
+        )}
+
+        {/* 🌀 4D HYPER WAVE COLLAPSE SECTION */}
+        {isWidgetVisible('hyper4d') && (
+          <section className="flex flex-col gap-6 w-full" style={{ order: getWidgetOrder('hyper4d') }}>
+            <PremiumLock isPremium={isPremium} onUnlock={() => (window as any).triggerUpgradeModal?.()}>
+              {/* Cyber Sub-navigation bar */}
+              <div className="flex items-center justify-between bg-slate-950/70 border border-slate-900 rounded-xl p-2.5 font-mono">
+                <div className="flex items-center gap-2 px-3">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                  <span className="text-[10px] text-slate-400 uppercase tracking-widest font-black">Dimension Mode Selector:</span>
+                </div>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => setHyper4dSubTab('collapser')}
+                    className={`py-1.5 px-3.5 rounded-lg text-[10px] font-bold border transition ${
+                      hyper4dSubTab === 'collapser'
+                        ? 'bg-cyan-950 border-cyan-500/50 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
+                        : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    🌀 4D WAVE COLLAPSER
+                  </button>
+                  <button
+                    onClick={() => setHyper4dSubTab('sandbox')}
+                    className={`py-1.5 px-3.5 rounded-lg text-[10px] font-bold border transition ${
+                      hyper4dSubTab === 'sandbox'
+                        ? 'bg-purple-950 border-purple-500/50 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
+                        : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    🎮 IMMERSIVE 3D SANDBOX
+                  </button>
+                </div>
+              </div>
+
+              {/* Sub-component viewport render */}
+              {hyper4dSubTab === 'collapser' ? (
+                <Hyper4DWaveCollapser 
+                  draws={draws}
+                  activeProposedNumbers={proposedNumbers}
+                  onApplyNumbers={(nums) => setProposedNumbers(nums)}
+                  playSpeech={playSpeech}
+                  isTTSEnabled={isTTSEnabled}
+                  addToast={(title, message, type) => addToast(title, message, type as any)}
+                />
+              ) : (
+                <ThreeDQuantumSandbox 
+                  onApplyNumbers={(nums) => setProposedNumbers(nums)}
+                  playSpeech={playSpeech}
+                  addToast={(title, message, type) => addToast(title, message, type as any)}
+                />
+              )}
+            </PremiumLock>
           </section>
         )}
 
@@ -8196,6 +8289,21 @@ We have a confident cross-reference match with our database!
         messages={messages}
         isThinking={isJarvisThinking}
         onSendMessage={sendJarvisMessage}
+      />
+
+      {/* PREMIUM SUBSCRIPTION & DAILY FORTUNE MANAGER */}
+      <PremiumSubscriptionManager 
+        addToast={addToast}
+        playSpeech={playSpeech}
+        onPremiumChange={(isPrem) => setIsPremium(isPrem)}
+      />
+
+      {/* USER REGISTRATION & AUTHENTICATION DIALOG */}
+      <UserProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        addToast={addToast}
+        playSpeech={playSpeech}
       />
 
     </div>
