@@ -11,6 +11,8 @@ import DWaveQuantumEngine from './components/DWaveQuantumEngine';
 import MultivariateMLPredictor from './components/MultivariateMLPredictor';
 import OmniQuantumHUD from './components/OmniQuantumHUD';
 import CorvusCodexLotteryAi from './components/CorvusCodexLotteryAi';
+import SuperIntelligencePatternEngine from './components/SuperIntelligencePatternEngine';
+import FalkenLotoAiPredictor from './components/FalkenLotoAiPredictor';
 import IshanoshadaPredictor from './components/IshanoshadaPredictor';
 import SentientCognitiveOracle from './components/SentientCognitiveOracle';
 import SimplePredictorDeck from './components/SimplePredictorDeck';
@@ -21,10 +23,14 @@ import StrategyProbabilityHeatmap from './components/StrategyProbabilityHeatmap'
 import QuantumStringTabSpace from './components/QuantumStringTabSpace';
 import QuantumVirtualMachine from './components/QuantumVirtualMachine';
 import QuantumSuperpositionVisualizer from './components/QuantumSuperpositionVisualizer';
+import Hyper4DWaveCollapser from './components/Hyper4DWaveCollapser';
+import ThreeDQuantumSandbox from './components/ThreeDQuantumSandbox';
+import ConsciousAgentResearcher from './components/ConsciousAgentResearcher';
 import QuantumPredictionEngine from './components/QuantumPredictionEngine';
 import QuantumTetrahedronSandbox from './components/QuantumTetrahedronSandbox';
 import QuantumQubitTerminal from './components/QuantumQubitTerminal';
 import FloatingAgentJarvis from './components/FloatingAgentJarvis';
+import WinningsSuccessDashboard from './components/WinningsSuccessDashboard';
 import Markdown from 'react-markdown';
 import { AnimatePresence } from 'motion/react';
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid, LabelList, BarChart, Bar, Cell, ScatterChart, Scatter, ZAxis } from 'recharts';
@@ -215,7 +221,8 @@ export default function App() {
   });
 
   // Advanced Visual UX / Toast & Calculating States
-  const [activeCategory, setActiveCategory] = useState<'engines' | 'analytics' | 'summary' | 'data' | 'jarvis' | 'simple' | 'swarms' | 'string3d' | 'qvm' | 'dashy' | 'dashy_view'>('engines');
+  const [activeCategory, setActiveCategory] = useState<'engines' | 'analytics' | 'summary' | 'data' | 'jarvis' | 'simple' | 'swarms' | 'string3d' | 'qvm' | 'dashy' | 'dashy_view' | 'winnings' | 'hyper4d' | 'agent_research'>('engines');
+  const [hyper4dSubTab, setHyper4dSubTab] = useState<'collapser' | 'sandbox'>('collapser');
   const [toasts, setToasts] = useState<{ id: string; type: 'success' | 'info' | 'error' | 'warning'; title: string; message: string }[]>([]);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isControlPanelOpen, setIsControlPanelOpen] = useState(false);
@@ -241,7 +248,7 @@ export default function App() {
   const isWidgetVisible = (widgetId: string) => {
     if (activeCategory === widgetId) return true;
     if (activeCategory === 'dashy_view') {
-      return dashyConfig.sections.some(s => s.widgets.includes(widgetId));
+      return dashyConfig?.sections?.some(s => s?.widgets?.includes(widgetId)) ?? false;
     }
     return false;
   };
@@ -249,7 +256,7 @@ export default function App() {
   const getWidgetOrder = (widgetId: string) => {
     if (activeCategory !== 'dashy_view') return 0;
     // Find the order index based on the flattened list of widgets across sections
-    const flattenedWidgets = dashyConfig.sections.flatMap(s => s.widgets);
+    const flattenedWidgets = dashyConfig?.sections?.flatMap(s => s?.widgets || []) || [];
     const index = flattenedWidgets.indexOf(widgetId);
     return index !== -1 ? index : 999;
   };
@@ -583,7 +590,15 @@ export default function App() {
       const utterance = new SpeechSynthesisUtterance(cleanText);
       // Look for standard english voice with sleek pace
       const voices = window.speechSynthesis.getVoices();
-      const engVoice = voices.find(v => v.lang.includes('en') && (v.name.includes('Google') || v.name.includes('Premium')));
+      const engVoice = voices.find(v => 
+        v && 
+        typeof v.lang === 'string' && 
+        v.lang.includes('en') && 
+        (
+          (v.name && typeof v.name === 'string' && (v.name.includes('Google') || v.name.includes('Premium'))) || 
+          false
+        )
+      );
       if (engVoice) utterance.voice = engVoice;
       utterance.rate = 1.05;
       utterance.pitch = 0.95; // Slightly deeper, sophisticated
@@ -4205,9 +4220,12 @@ We have a confident cross-reference match with our database!
             { id: 'analytics', label: 'PATTERN ANALYTICS' },
             { id: 'string3d', label: '🌌 STRING WIREFRAME 3D' },
             { id: 'qvm', label: '⚛️ QUANTUM VM' },
+            { id: 'hyper4d', label: '🌀 4D HYPER WAVE COLLAPSE' },
             { id: 'summary', label: 'INSIGHTS & SUMMARY' },
             { id: 'data', label: 'HISTORICAL DATA' },
             { id: 'jarvis', label: 'J.A.R.V.I.S. HUB' },
+            { id: 'agent_research', label: '🧠 CONSCIOUS AGENT' },
+            { id: 'winnings', label: '🏆 WINNINGS & SUCCESS' },
             { id: 'dashy_view', label: '📊 BET DASHBOARD' },
             { id: 'dashy', label: '🎛️ DASHBOARD BUILDER' }
           ].map(cat => (
@@ -4229,6 +4247,34 @@ We have a confident cross-reference match with our database!
 
       {/* CORE DISPLAY FLOOR */}
       <main className="flex-1 max-w-7xl mx-auto w-full flex flex-col gap-6 p-4 sm:p-6 z-10 overflow-y-auto relative">
+
+        {/* 🧠 CONSCIOUS AGENT RESEARCHER */}
+        {activeCategory === 'agent_research' && (
+          <ConsciousAgentResearcher
+            draws={draws}
+            addToast={addToast}
+            onApplyNumbers={(nums) => {
+              setProposedNumbers(nums);
+            }}
+            playSpeech={playSpeech}
+          />
+        )}
+
+        {/* 🏆 WINNINGS & SUCCESS RATE DASHBOARD */}
+        {activeCategory === 'winnings' && (
+          <WinningsSuccessDashboard 
+            addToast={(title, message, type) => {
+              const newToast = {
+                id: Date.now().toString(),
+                type: type,
+                title: title,
+                message: message
+              };
+              setToasts(prev => [newToast, ...prev]);
+            }}
+            proposedNumbers={proposedNumbers}
+          />
+        )}
 
         {/* 📊 BET DASHBOARD CANVAS EDITOR */}
         {activeCategory === 'dashy_view' && (
@@ -7406,6 +7452,30 @@ We have a confident cross-reference match with our database!
             }}
           />
 
+          {/* SUPER INTELLIGENCE DELTA & MARKOV TRANSITION ENGINE */}
+          <SuperIntelligencePatternEngine
+            draws={draws}
+            activeProposedNumbers={proposedNumbers}
+            playSpeech={playSpeech}
+            isTTSEnabled={isTTSEnabled}
+            addToast={addToast}
+            onApplyNumbers={(nums) => {
+              setProposedNumbers(nums);
+            }}
+          />
+
+          {/* FALKEN LOTO AI PREDICTION FRAMEWORK */}
+          <FalkenLotoAiPredictor
+            draws={draws}
+            activeProposedNumbers={proposedNumbers}
+            playSpeech={playSpeech}
+            isTTSEnabled={isTTSEnabled}
+            addToast={addToast}
+            onApplyNumbers={(nums) => {
+              setProposedNumbers(nums);
+            }}
+          />
+
           {/* 3D QUANTUM COMPUTATION & RE-ANALYZER LAYER */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Omni 3D Space Constellation visualizer */}
@@ -7839,19 +7909,25 @@ We have a confident cross-reference match with our database!
                         { id: 'jarvis', label: 'J.A.R.V.I.S. Hub' }
                       ].map(widget => {
                         // Check if it's currently active (we can just add it to section 1 for simplicity if toggled)
-                        const isActive = dashyConfig.sections.some(s => s.widgets.includes(widget.id));
+                        const isActive = dashyConfig?.sections?.some(s => s?.widgets?.includes(widget.id)) ?? false;
                         
                         return (
                           <button
                             key={widget.id}
                             onClick={() => {
+                              if (!dashyConfig?.sections) return;
                               const newSections = [...dashyConfig.sections];
                               if (isActive) {
                                 newSections.forEach(s => {
-                                  s.widgets = s.widgets.filter(w => w !== widget.id);
+                                  if (s) {
+                                    s.widgets = s.widgets?.filter(w => w !== widget.id) || [];
+                                  }
                                 });
                               } else {
-                                if (newSections.length > 0) {
+                                if (newSections.length > 0 && newSections[0]) {
+                                  if (!newSections[0].widgets) {
+                                    newSections[0].widgets = [];
+                                  }
                                   newSections[0].widgets.push(widget.id);
                                 }
                               }
@@ -7926,6 +8002,60 @@ We have a confident cross-reference match with our database!
             />
             <QuantumPredictionEngine particles={particles} />
             <QuantumTetrahedronSandbox />
+          </section>
+        )}
+
+        {/* 🌀 4D HYPER WAVE COLLAPSE SECTION */}
+        {isWidgetVisible('hyper4d') && (
+          <section className="flex flex-col gap-6 w-full" style={{ order: getWidgetOrder('hyper4d') }}>
+            
+            {/* Cyber Sub-navigation bar */}
+            <div className="flex items-center justify-between bg-slate-950/70 border border-slate-900 rounded-xl p-2.5 font-mono">
+              <div className="flex items-center gap-2 px-3">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                <span className="text-[10px] text-slate-400 uppercase tracking-widest font-black">Dimension Mode Selector:</span>
+              </div>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => setHyper4dSubTab('collapser')}
+                  className={`py-1.5 px-3.5 rounded-lg text-[10px] font-bold border transition ${
+                    hyper4dSubTab === 'collapser'
+                      ? 'bg-cyan-950 border-cyan-500/50 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
+                      : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700'
+                  }`}
+                >
+                  🌀 4D WAVE COLLAPSER
+                </button>
+                <button
+                  onClick={() => setHyper4dSubTab('sandbox')}
+                  className={`py-1.5 px-3.5 rounded-lg text-[10px] font-bold border transition ${
+                    hyper4dSubTab === 'sandbox'
+                      ? 'bg-purple-950 border-purple-500/50 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
+                      : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700'
+                  }`}
+                >
+                  🎮 IMMERSIVE 3D SANDBOX
+                </button>
+              </div>
+            </div>
+
+            {/* Sub-component viewport render */}
+            {hyper4dSubTab === 'collapser' ? (
+              <Hyper4DWaveCollapser 
+                draws={draws}
+                activeProposedNumbers={proposedNumbers}
+                onApplyNumbers={(nums) => setProposedNumbers(nums)}
+                playSpeech={playSpeech}
+                isTTSEnabled={isTTSEnabled}
+                addToast={(title, message, type) => addToast(title, message, type as any)}
+              />
+            ) : (
+              <ThreeDQuantumSandbox 
+                onApplyNumbers={(nums) => setProposedNumbers(nums)}
+                playSpeech={playSpeech}
+                addToast={(title, message, type) => addToast(title, message, type as any)}
+              />
+            )}
           </section>
         )}
 

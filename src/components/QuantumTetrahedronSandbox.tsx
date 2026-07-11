@@ -273,8 +273,9 @@ export default function QuantumTetrahedronSandbox() {
     if (!canvas) return;
     
     const pos = getCanvasMousePos(e, canvas);
+    const isLeftClick = 'buttons' in e ? (e as any).buttons === 1 : true;
     
-    if (connectStartNode === null && !isRotating && e.buttons === 1) {
+    if (connectStartNode === null && !isRotating && isLeftClick) {
       // Manual rotation
       rotationRef.current.y += (pos.x - mousePos.x) * 0.01;
       rotationRef.current.x += (pos.y - mousePos.y) * 0.01;

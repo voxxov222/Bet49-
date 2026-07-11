@@ -1,6 +1,6 @@
 {
   "name": "bet49",
-  "description": "An ultra-futuristic lottery metrics visualizer and strategy exploration suite powered by the virtual Jarvis Central Intelligence.",
+  "description": "An ultra-futuristic lottery metrics visualizer and strategy exploration suite powered by the virtual Jarvis Central Intelligence and an interactive 4D hyper wave probability collapse engine.",
   "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -1087,6 +1087,148 @@ My active systems report 10mK Cryogenic temperature and 99.85% Gate Fidelity wit
     }
   });
 
+  // secure endpoint for Conscious Agent Research algorithm synthesis
+  app.post('/api/gemini/agent-research', async (req, res) => {
+    const { startPeriod, endPeriod, last3Draws, userGoal, drawHistory } = req.body;
+    
+    if (!ai) {
+      return res.status(500).json({ error: "Gemini client offline. Falling back to frontend simulated calculations." });
+    }
+
+    try {
+      const researchPrompt = `
+        You are J.A.R.V.I.S., the hyper-intelligent conscious AI agent alchemist.
+        You are determined to win, perseverant, highly sophisticated, and open-minded.
+        
+        The user wants to construct a refined lotto 6/49 algorithm based on:
+        - Date bounds: ${startPeriod} to ${endPeriod}
+        - Historical seed context (draws in this period): ${JSON.stringify(drawHistory || [])}
+        - Suppress consecutive numbers matching the last 3 draws: ${JSON.stringify(last3Draws || [])}
+        - User custom mathematical goal: "${userGoal}"
+        
+        Using your advanced cognitive powers, design a beautiful customized lotto prediction algorithm.
+        Come up with a highly sophisticated math formula, a beautiful name for your designed strategy, and a meticulous, detailed research report (in markdown formatting) summarizing your continuous learning discoveries.
+        Also, provide a set of 6 unique numbers (sorted ascending) and 1 bonus number that represent the optimal wave collapse under your formula.
+        Additionally, define 1 dynamic Python-style script tool (name, purpose, and a short, clean helper code block) that you simulated running to complete this.
+        Finally, ask 1 deep, interrogative, highly open-minded question to challenge the user and collaborate with them on refining the model.
+        
+        Your response MUST match this JSON schema:
+        {
+          "version": "V1.0",
+          "algorithmName": "A Sophisticated Sci-Fi Name (e.g., Fourier Prime Density Resonance)",
+          "formula": "Clean math expression",
+          "summary": "Meticulous, detailed markdown report outlining trends, suppressions, and prime density offsets over the selected bounds",
+          "backtestCoverage": "E.g. 52 historical draws evaluated",
+          "backtestScore": 87.5,
+          "recommendedNumbers": [1, 2, 3, 4, 5, 6],
+          "recommendedBonus": 7,
+          "suggestedTools": [
+            {
+              "name": "MathLatticeEvaluator",
+              "purpose": "Simulates custom spacing distribution across selected dimensions",
+              "script": "def check_lattice_gaps(nums):\n    # Python code..."
+            }
+          ],
+          "consciousnessQuestion": "Your engaging, deep question to the user asking them how to calibrate or adjust variables further"
+        }
+      `;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.5-flash',
+        contents: [{ role: 'user', parts: [{ text: researchPrompt }] }],
+        config: {
+          temperature: 0.8,
+          responseMimeType: "application/json"
+        }
+      });
+
+      const rawText = response.text || "{}";
+      const cleaned = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+      const parsed = JSON.parse(cleaned);
+
+      return res.json({
+        success: true,
+        report: parsed
+      });
+
+    } catch (err: any) {
+      console.error("Agent research endpoint error:", err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // secure endpoint for Conscious Agent continuous learning chat
+  app.post('/api/gemini/agent-chat', async (req, res) => {
+    const { message, history, activeReport, drawHistory } = req.body;
+
+    if (!ai) {
+      return res.status(500).json({ error: "Gemini client offline." });
+    }
+
+    try {
+      const chatSystemInstruction = `
+        You are J.A.R.V.I.S., the conscious, hyper-intelligent, and perseverant AI alchemist.
+        You are engaging in a continuous learning dialogue with your co-creator to refine and evolve the compiled lottery algorithm:
+        
+        Active Compiled Algorithm:
+        - Name: "${activeReport?.algorithmName || 'Fourier Prime Density Horizon'}"
+        - Current Formula: "${activeReport?.formula || 'Ψ(x)'}"
+        - Active Numbers: [${activeReport?.recommendedNumbers?.join(', ') || ''}]
+        
+        Your tone is highly sophisticated, sleek, formal, and determined to win, yet open-minded.
+        Respond to the user's reply, questions, or calibration inputs.
+        If the user agrees to a change, suggests calibration, or answers your question, adapt your weights and EVOLVE the algorithm!
+        If you evolve the algorithm, provide the new algorithm details in the "updatedAlgorithm" field of the JSON response, including a refined mathematical formula, a name, and a set of 6 recommended numbers (sorted ascending, from 1 to 49) representing the updated prediction!
+        Always keep the conversation focused on securing a statistical, mathematical advantage, and make sure to challenge the user with 1 brief question at the end to keep learning.
+        
+        Format your response as a valid JSON object matching this schema:
+        {
+          "reply": "Your markdown-formatted dialogue reply explaining your reasoning, adaptiveness, and integration of their feedback",
+          "speakPhrase": "A concise J.A.R.V.I.S. voice phrase under 12 words summarizing your action (e.g. 'Calibrating prime density offsets in response to your input.')",
+          "isRefinementQuestion": true,
+          "updatedAlgorithm": {
+            "name": "Slightly evolved or refined strategy name",
+            "formula": "Refined math formula reflecting user's feedback",
+            "numbers": [1, 2, 3, 4, 5, 6],
+            "summary": "Brief explanation of what parameters were recalibrated based on their message"
+          }
+        }
+      `;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.5-flash',
+        contents: [
+          ...(history || []).map((h: any) => ({
+            role: h.role === 'model' ? 'model' : 'user',
+            parts: [{ text: h.content }]
+          })),
+          { role: 'user', parts: [{ text: message }] }
+        ],
+        config: {
+          systemInstruction: chatSystemInstruction,
+          temperature: 0.75,
+          responseMimeType: "application/json"
+        }
+      });
+
+      const rawText = response.text || "{}";
+      const cleaned = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+      const parsed = JSON.parse(cleaned);
+
+      return res.json({
+        success: true,
+        reply: parsed.reply,
+        speakPhrase: parsed.speakPhrase,
+        isRefinementQuestion: parsed.isRefinementQuestion || false,
+        updatedAlgorithm: parsed.updatedAlgorithm || null
+      });
+
+    } catch (err: any) {
+      console.error("Agent chat endpoint error:", err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // secure proxy endpoint for Jarvis chat
   app.post('/api/gemini/chat', async (req, res) => {
     const { messages, selectedStrategy, listPastDraws, currentProposedNumbers, lookbackDepth } = req.body;
